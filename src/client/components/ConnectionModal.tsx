@@ -1,29 +1,44 @@
 import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '../api/client'
-import type { Connection } from '../../types'
+import type { Connection, DbType } from '../../types'
 
 interface ConnectionModalProps {
   connections: Connection[]
   onClose: () => void
 }
 
+const DB_TYPE_LABELS: Record<DbType, string> = {
+  sqlserver: 'SQL Server',
+  postgres: 'Postgres',
+  sqlite: 'SQLite',
+}
+
+const CONN_STR_PLACEHOLDER: Record<DbType, string> = {
+  sqlserver: 'Server=localhost;Database=mydb;User Id=sa;Password=...',
+  postgres: 'postgresql://user:password@localhost:5432/mydb',
+  sqlite: '/path/to/database.db',
+}
+
 export function ConnectionModal({ connections, onClose }: ConnectionModalProps) {
   const [name, setName] = useState('')
   const [connStr, setConnStr] = useState('')
+  const [dbType, setDbType] = useState<DbType>('sqlserver')
   const [testResult, setTestResult] = useState<'idle' | 'ok' | 'error'>('idle')
   const [testError, setTestError] = useState('')
   const qc = useQueryClient()
 
   const addMutation = useMutation({
     mutationFn: async () => {
-      const res = await api.api.connections.post({ name, connectionString: connStr })
+      const res = await api.api.connections.post({ name, connectionString: connStr, type: dbType })
       if (res.error) throw new Error((res.error as { value?: { error?: string } }).value?.error ?? 'Failed to add connection')
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['connections'] })
       setName('')
       setConnStr('')
+      setDbType('sqlserver')
+      setTestResult('idle')
     }
   })
 
@@ -40,7 +55,7 @@ export function ConnectionModal({ connections, onClose }: ConnectionModalProps) 
     setTestResult('idle')
     setTestError('')
     try {
-      const res = await api.api.connections.test.post({ connectionString: connStr })
+      const res = await api.api.connections.test.post({ connectionString: connStr, type: dbType })
       if (res.error || (res.data as { ok: boolean }).ok === false) {
         setTestResult('error')
         setTestError((res.data as { error?: string })?.error ?? 'Connection failed')
@@ -64,7 +79,7 @@ export function ConnectionModal({ connections, onClose }: ConnectionModalProps) 
       <div
         style={{
           background: 'var(--surface)', borderRadius: 'var(--r)',
-          border: '1px solid var(--border)', padding: 24, width: 440,
+          border: '1px solid var(--border)', padding: 24, width: 460,
           boxShadow: 'var(--shadow-lg)',
         }}
         onClick={e => e.stopPropagation()}
@@ -86,6 +101,7 @@ export function ConnectionModal({ connections, onClose }: ConnectionModalProps) 
           }}>
             <div style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--ok-color)', flexShrink: 0 }} />
             <span style={{ flex: 1, fontSize: 13, fontWeight: 500, color: 'var(--text-1)' }}>{c.name}</span>
+            <span style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 500 }}>{DB_TYPE_LABELS[c.type]}</span>
             <button
               onClick={() => deleteMutation.mutate(c.name)}
               style={{
@@ -99,6 +115,30 @@ export function ConnectionModal({ connections, onClose }: ConnectionModalProps) 
         ))}
 
         <div style={{ marginTop: 20, display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {/* DB type segmented control */}
+          <div style={{
+            display: 'flex', gap: 2,
+            background: 'var(--bg)', borderRadius: 'var(--r-sm)',
+            border: '1px solid var(--border-strong)', padding: 3,
+          }}>
+            {(['sqlserver', 'postgres', 'sqlite'] as DbType[]).map(t => (
+              <button
+                key={t}
+                onClick={() => { setDbType(t); setTestResult('idle') }}
+                style={{
+                  flex: 1, padding: '5px 8px',
+                  borderRadius: 5, border: 'none', cursor: 'pointer',
+                  fontFamily: 'inherit', fontSize: 12, fontWeight: 600,
+                  background: dbType === t ? 'var(--surface)' : 'transparent',
+                  color: dbType === t ? 'var(--text-1)' : 'var(--text-3)',
+                  transition: 'background 0.15s, color 0.15s',
+                }}
+              >
+                {DB_TYPE_LABELS[t]}
+              </button>
+            ))}
+          </div>
+
           <input
             value={name}
             onChange={e => setName(e.target.value)}
@@ -108,7 +148,7 @@ export function ConnectionModal({ connections, onClose }: ConnectionModalProps) 
           <input
             value={connStr}
             onChange={e => { setConnStr(e.target.value); setTestResult('idle') }}
-            placeholder="Server=...;Database=...;User Id=...;Password=..."
+            placeholder={CONN_STR_PLACEHOLDER[dbType]}
             style={inputStyle}
           />
           {testResult === 'error' && testError && (
@@ -125,7 +165,7 @@ export function ConnectionModal({ connections, onClose }: ConnectionModalProps) 
                 border: '1px solid var(--border-strong)',
                 background: 'var(--bg)', fontFamily: 'inherit', fontSize: 13, fontWeight: 600,
                 cursor: connStr ? 'pointer' : 'not-allowed',
-                color: testResult === 'ok' ? '#22C55E' : testResult === 'error' ? '#EF4444' : 'var(--text-2)',
+                color: testResult === 'ok' ? 'var(--ok-color)' : testResult === 'error' ? 'var(--err-color)' : 'var(--text-2)',
               }}
             >
               {testResult === 'ok' ? '✓ Connected' : testResult === 'error' ? '✗ Failed' : 'Test'}
