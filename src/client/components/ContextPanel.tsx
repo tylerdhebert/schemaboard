@@ -11,6 +11,8 @@ interface ContextPanelProps {
 export function ContextPanel({ schemaData }: ContextPanelProps) {
   const { selectedTables, format, autoExpand, setFormat, setAutoExpand } = useStore()
   const [copied, setCopied] = useState(false)
+  const [isEditing, setIsEditing] = useState(false)
+  const [editedText, setEditedText] = useState('')
 
   const selectedTableData = useMemo(() =>
     schemaData.tables.filter(t => selectedTables.has(`${t.schema}.${t.name}`)),
@@ -29,10 +31,18 @@ export function ContextPanel({ schemaData }: ContextPanelProps) {
       : generateDDL(selectedTableData, relevantFKs)
   }, [selectedTableData, relevantFKs, format])
 
-  const tokenCount = useMemo(() => estimateTokens(contextText), [contextText])
+  const displayText = isEditing ? editedText : contextText
+  const tokenCount = useMemo(() => estimateTokens(displayText), [displayText])
+
+  const handleToggleEdit = () => {
+    if (!isEditing) {
+      setEditedText(contextText)
+    }
+    setIsEditing(v => !v)
+  }
 
   const handleCopy = async () => {
-    await navigator.clipboard.writeText(contextText)
+    await navigator.clipboard.writeText(displayText)
     setCopied(true)
     setTimeout(() => setCopied(false), 1800)
   }
@@ -108,16 +118,59 @@ export function ContextPanel({ schemaData }: ContextPanelProps) {
         </div>
       </div>
 
-      {/* Preview */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '14px 18px' }}>
-        {contextText ? (
-          <pre style={{
-            fontFamily: 'ui-monospace, Cascadia Code, monospace',
-            fontSize: 11, lineHeight: 1.75, color: 'var(--text-1)',
-            whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-          }}>
-            {contextText}
-          </pre>
+      {/* Preview header with edit toggle */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '8px 18px 6px',
+      }}>
+        <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.8px', textTransform: 'uppercase', color: 'var(--text-3)' }}>
+          {isEditing ? 'Editing' : 'Preview'}
+        </span>
+        <button
+          onClick={handleToggleEdit}
+          disabled={!contextText && !isEditing}
+          style={{
+            fontSize: 11, fontWeight: 600, padding: '3px 9px',
+            borderRadius: 5, border: '1px solid var(--border-strong)',
+            background: isEditing ? 'var(--accent)' : 'transparent',
+            color: isEditing ? 'white' : 'var(--text-3)',
+            cursor: contextText || isEditing ? 'pointer' : 'not-allowed',
+            fontFamily: 'inherit',
+            opacity: !contextText && !isEditing ? 0.4 : 1,
+          }}
+        >
+          {isEditing ? 'Done' : 'Edit'}
+        </button>
+      </div>
+
+      {/* Preview / Edit area */}
+      <div style={{ flex: 1, overflow: 'hidden', padding: '0 18px 14px', display: 'flex', flexDirection: 'column' }}>
+        {isEditing ? (
+          <textarea
+            value={editedText}
+            onChange={e => setEditedText(e.target.value)}
+            style={{
+              flex: 1, width: '100%', resize: 'none',
+              fontFamily: 'ui-monospace, Cascadia Code, monospace',
+              fontSize: 11, lineHeight: 1.75,
+              color: 'var(--text-1)', background: 'var(--bg)',
+              border: '1px solid var(--border-strong)',
+              borderRadius: 'var(--r-sm)',
+              padding: '10px 12px', outline: 'none',
+              boxSizing: 'border-box',
+            }}
+          />
+        ) : contextText ? (
+          <div style={{ flex: 1, overflowY: 'auto' }}>
+            <pre style={{
+              fontFamily: 'ui-monospace, Cascadia Code, monospace',
+              fontSize: 11, lineHeight: 1.75, color: 'var(--text-1)',
+              whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+              margin: 0,
+            }}>
+              {contextText}
+            </pre>
+          </div>
         ) : (
           <div style={{ color: 'var(--text-3)', fontSize: 13, lineHeight: 1.6 }}>
             Select tables in the diagram to preview context output here.
@@ -141,17 +194,17 @@ export function ContextPanel({ schemaData }: ContextPanelProps) {
         </div>
         <button
           onClick={handleCopy}
-          disabled={!contextText}
+          disabled={!displayText}
           style={{
             display: 'inline-flex', alignItems: 'center', gap: 6,
             padding: '8px 16px', borderRadius: 'var(--r-sm)',
             fontFamily: 'inherit', fontSize: 13, fontWeight: 700,
-            cursor: contextText ? 'pointer' : 'not-allowed',
+            cursor: displayText ? 'pointer' : 'not-allowed',
             border: 'none',
-            background: contextText ? 'var(--accent-grad)' : 'rgba(255,255,255,0.1)',
+            background: displayText ? 'var(--accent-grad)' : 'rgba(255,255,255,0.1)',
             color: 'white',
-            boxShadow: contextText ? '0 2px 10px rgba(74,123,245,0.28)' : 'none',
-            opacity: contextText ? 1 : 0.5,
+            boxShadow: displayText ? '0 2px 10px rgba(74,123,245,0.28)' : 'none',
+            opacity: displayText ? 1 : 0.5,
           }}
         >
           {copied ? '✓ Copied!' : 'Copy context'}
