@@ -12,7 +12,12 @@ export const sqliteAdapter: DbAdapter = {
     }
   },
 
-  async fetchSchema(connectionString) {
+  async listSchemas(_connectionString) {
+    return ['main']
+  },
+
+  async fetchSchema(connectionString, excludedSchemas) {
+    if (excludedSchemas?.includes('main')) return { tables: [], foreignKeys: [] }
     const db = new Database(connectionString, { readonly: true })
     try {
       const tableNames = db

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '../api/client'
 import type { Connection, DbType } from '../../types'
@@ -26,11 +26,20 @@ export function ConnectionModal({ connections, onClose }: ConnectionModalProps) 
   const [dbType, setDbType] = useState<DbType>('sqlserver')
   const [testResult, setTestResult] = useState<'idle' | 'ok' | 'error'>('idle')
   const [testError, setTestError] = useState('')
+  const [availableSchemas, setAvailableSchemas] = useState<string[]>([])
+  const [excludedSchemas, setExcludedSchemas] = useState<string[]>([])
+  const [chipInput, setChipInput] = useState('')
+  const chipInputRef = useRef<HTMLInputElement>(null)
   const qc = useQueryClient()
 
   const addMutation = useMutation({
     mutationFn: async () => {
-      const res = await api.api.connections.post({ name, connectionString: connStr, type: dbType })
+      const res = await api.api.connections.post({
+        name,
+        connectionString: connStr,
+        type: dbType,
+        excludedSchemas,
+      })
       if (res.error) throw new Error((res.error as { value?: { error?: string } }).value?.error ?? 'Failed to add connection')
     },
     onSuccess: () => {
@@ -39,6 +48,9 @@ export function ConnectionModal({ connections, onClose }: ConnectionModalProps) 
       setConnStr('')
       setDbType('sqlserver')
       setTestResult('idle')
+      setAvailableSchemas([])
+      setExcludedSchemas([])
+      setChipInput('')
     }
   })
 
@@ -54,17 +66,49 @@ export function ConnectionModal({ connections, onClose }: ConnectionModalProps) 
   const handleTest = async () => {
     setTestResult('idle')
     setTestError('')
+    setAvailableSchemas([])
     try {
       const res = await api.api.connections.test.post({ connectionString: connStr, type: dbType })
-      if (res.error || (res.data as { ok: boolean }).ok === false) {
+      const data = res.data as { ok: boolean; schemas?: string[]; error?: string } | null
+      if (res.error || !data?.ok) {
         setTestResult('error')
-        setTestError((res.data as { error?: string })?.error ?? 'Connection failed')
+        setTestError(data?.error ?? 'Connection failed')
       } else {
         setTestResult('ok')
+        setAvailableSchemas(data.schemas ?? [])
       }
     } catch (err) {
       setTestResult('error')
       setTestError(err instanceof Error ? err.message : 'Connection failed')
+    }
+  }
+
+  const addChip = (value: string) => {
+    const schema = value.trim()
+    if (schema && !excludedSchemas.includes(schema)) {
+      setExcludedSchemas(prev => [...prev, schema])
+    }
+  }
+
+  const removeChip = (schema: string) => {
+    setExcludedSchemas(prev => prev.filter(s => s !== schema))
+  }
+
+  const handleChipKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if ((e.key === ' ' || e.key === 'Enter') && chipInput.trim()) {
+      e.preventDefault()
+      addChip(chipInput)
+      setChipInput('')
+    } else if (e.key === 'Backspace' && !chipInput && excludedSchemas.length) {
+      setExcludedSchemas(prev => prev.slice(0, -1))
+    }
+  }
+
+  const toggleAvailableSchema = (schema: string) => {
+    if (excludedSchemas.includes(schema)) {
+      removeChip(schema)
+    } else {
+      addChip(schema)
     }
   }
 
@@ -124,7 +168,7 @@ export function ConnectionModal({ connections, onClose }: ConnectionModalProps) 
             {(['sqlserver', 'postgres', 'sqlite'] as DbType[]).map(t => (
               <button
                 key={t}
-                onClick={() => { setDbType(t); setTestResult('idle') }}
+                onClick={() => { setDbType(t); setTestResult('idle'); setAvailableSchemas([]) }}
                 style={{
                   flex: 1, padding: '5px 8px',
                   borderRadius: 5, border: 'none', cursor: 'pointer',
@@ -147,10 +191,89 @@ export function ConnectionModal({ connections, onClose }: ConnectionModalProps) 
           />
           <input
             value={connStr}
-            onChange={e => { setConnStr(e.target.value); setTestResult('idle') }}
+            onChange={e => { setConnStr(e.target.value); setTestResult('idle'); setAvailableSchemas([]) }}
             placeholder={CONN_STR_PLACEHOLDER[dbType]}
             style={inputStyle}
           />
+
+          {/* Schema exclusion */}
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', marginBottom: 5, letterSpacing: '0.5px', textTransform: 'uppercase' }}>
+              Exclude schemas
+            </div>
+
+            {/* Available schemas (shown after successful test) */}
+            {availableSchemas.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 7 }}>
+                {availableSchemas.map(schema => {
+                  const excluded = excludedSchemas.includes(schema)
+                  return (
+                    <button
+                      key={schema}
+                      onClick={() => toggleAvailableSchema(schema)}
+                      style={{
+                        padding: '3px 9px', borderRadius: 20, fontSize: 11, fontWeight: 600,
+                        cursor: 'pointer', fontFamily: 'inherit',
+                        border: `1px solid ${excluded ? 'var(--accent)' : 'var(--border-strong)'}`,
+                        background: excluded ? 'var(--accent-light)' : 'transparent',
+                        color: excluded ? 'var(--accent)' : 'var(--text-3)',
+                      }}
+                    >
+                      {schema}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+
+            {/* Chip input */}
+            <div
+              style={{
+                display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 5,
+                padding: '6px 10px', minHeight: 38,
+                background: 'var(--bg)', border: '1px solid var(--border-strong)',
+                borderRadius: 'var(--r-sm)', cursor: 'text',
+              }}
+              onClick={() => chipInputRef.current?.focus()}
+            >
+              {excludedSchemas.map(schema => (
+                <span
+                  key={schema}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 4,
+                    padding: '2px 8px', borderRadius: 20,
+                    background: 'var(--accent-light)', color: 'var(--accent)',
+                    fontSize: 11, fontWeight: 600,
+                  }}
+                >
+                  {schema}
+                  <button
+                    onClick={e => { e.stopPropagation(); removeChip(schema) }}
+                    style={{
+                      background: 'none', border: 'none', cursor: 'pointer',
+                      color: 'var(--accent)', padding: 0, lineHeight: 1,
+                      fontSize: 13, display: 'flex', alignItems: 'center',
+                    }}
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+              <input
+                ref={chipInputRef}
+                value={chipInput}
+                onChange={e => setChipInput(e.target.value)}
+                onKeyDown={handleChipKeyDown}
+                placeholder={excludedSchemas.length === 0 ? 'Type a schema name, press space to add…' : ''}
+                style={{
+                  border: 'none', outline: 'none', background: 'transparent',
+                  color: 'var(--text-1)', fontFamily: 'inherit', fontSize: 12,
+                  minWidth: 120, flex: 1,
+                }}
+              />
+            </div>
+          </div>
+
           {testResult === 'error' && testError && (
             <div style={{ fontSize: 12, color: 'var(--err-color)', padding: '6px 10px', background: 'var(--err-bg)', borderRadius: 6 }}>
               {testError}

@@ -60,7 +60,20 @@ export const sqlServerAdapter: DbAdapter = {
     }
   },
 
-  async fetchSchema(connectionString) {
+  async listSchemas(connectionString) {
+    let pool: sql.ConnectionPool | undefined
+    try {
+      pool = await sql.connect(connectionString)
+      const result = await pool.request().query(
+        `SELECT DISTINCT TABLE_SCHEMA AS [schema] FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE' ORDER BY TABLE_SCHEMA`
+      )
+      return result.recordset.map((r: { schema: string }) => r.schema)
+    } finally {
+      await pool?.close()
+    }
+  },
+
+  async fetchSchema(connectionString, excludedSchemas) {
     let pool: sql.ConnectionPool | undefined
     try {
       pool = await sql.connect(connectionString)
@@ -69,7 +82,11 @@ export const sqlServerAdapter: DbAdapter = {
         pool.request().query(PKS_QUERY),
         pool.request().query(FKS_QUERY),
       ])
-      return buildSchemaData(colResult.recordset, pkResult.recordset, fkResult.recordset)
+      const excluded = new Set(excludedSchemas ?? [])
+      const cols = excluded.size
+        ? colResult.recordset.filter((r: { schema: string }) => !excluded.has(r.schema))
+        : colResult.recordset
+      return buildSchemaData(cols, pkResult.recordset, fkResult.recordset)
     } finally {
       await pool?.close()
     }

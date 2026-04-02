@@ -66,7 +66,20 @@ export const postgresAdapter: DbAdapter = {
     }
   },
 
-  async fetchSchema(connectionString) {
+  async listSchemas(connectionString) {
+    const client = new Client({ connectionString })
+    await client.connect()
+    try {
+      const result = await client.query(
+        `SELECT schema_name FROM information_schema.schemata WHERE schema_name NOT IN ('pg_catalog','information_schema','pg_toast') ORDER BY schema_name`
+      )
+      return result.rows.map((r: { schema_name: string }) => r.schema_name)
+    } finally {
+      await client.end()
+    }
+  },
+
+  async fetchSchema(connectionString, excludedSchemas) {
     const client = new Client({ connectionString })
     await client.connect()
     try {
@@ -75,7 +88,11 @@ export const postgresAdapter: DbAdapter = {
         client.query(PKS_QUERY),
         client.query(FKS_QUERY),
       ])
-      return buildSchemaData(colResult.rows, pkResult.rows, fkResult.rows)
+      const excluded = new Set(excludedSchemas ?? [])
+      const cols = excluded.size
+        ? colResult.rows.filter((r: { schema: string }) => !excluded.has(r.schema))
+        : colResult.rows
+      return buildSchemaData(cols, pkResult.rows, fkResult.rows)
     } finally {
       await client.end()
     }

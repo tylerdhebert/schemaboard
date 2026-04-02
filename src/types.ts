@@ -37,6 +37,7 @@ export interface Connection {
   name: string
   connectionString: string
   type: DbType
+  excludedSchemas?: string[]
 }
 
 export interface Group {

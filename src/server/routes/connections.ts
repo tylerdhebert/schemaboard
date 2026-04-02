@@ -17,7 +17,7 @@ export const connectionsRouter = new Elysia({ prefix: '/api/connections' })
       set.status = 409
       return { error: `Connection "${body.name}" already exists` }
     }
-    config.connections.push(body)
+    config.connections.push({ ...body, excludedSchemas: body.excludedSchemas ?? [] })
     writeConfig(config)
     return body
   }, {
@@ -25,15 +25,18 @@ export const connectionsRouter = new Elysia({ prefix: '/api/connections' })
       name: t.String(),
       connectionString: t.String(),
       type: DbTypeSchema,
+      excludedSchemas: t.Optional(t.Array(t.String())),
     })
   })
 
   .post('/test', async ({ body }) => {
+    const adapter = getAdapter(body.type)
     try {
-      await getAdapter(body.type).testConnection(body.connectionString)
-      return { ok: true }
+      await adapter.testConnection(body.connectionString)
+      const schemas = await adapter.listSchemas(body.connectionString).catch(() => [])
+      return { ok: true, schemas }
     } catch (err) {
-      return { ok: false, error: err instanceof Error ? err.message : String(err) }
+      return { ok: false, error: err instanceof Error ? err.message : String(err), schemas: [] }
     }
   }, {
     body: t.Object({
