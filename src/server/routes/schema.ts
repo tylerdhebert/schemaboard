@@ -1,8 +1,11 @@
 import { Elysia, t } from 'elysia'
 import { readConfig } from '../config'
-import { fetchSchema } from '../schema'
+import { getAdapter } from '../adapters'
+import { DEMO_SCHEMA } from '../demo-data'
 
 export const schemaRouter = new Elysia({ prefix: '/api/schema' })
+  .get('/demo', () => DEMO_SCHEMA)
+
   .get('/', async ({ query, set }) => {
     const config = readConfig()
     const conn = config.connections.find(c => c.name === query.connection)
@@ -11,7 +14,7 @@ export const schemaRouter = new Elysia({ prefix: '/api/schema' })
       return { error: `Connection "${query.connection}" not found` }
     }
     try {
-      return await fetchSchema(conn.connectionString)
+      return await getAdapter(conn.type).fetchSchema(conn.connectionString)
     } catch (err) {
       set.status = 502
       return { error: err instanceof Error ? err.message : String(err) }

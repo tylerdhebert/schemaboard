@@ -1,6 +1,12 @@
 import { Elysia, t } from 'elysia'
 import { readConfig, writeConfig } from '../config'
-import { testConnection } from '../schema'
+import { getAdapter } from '../adapters'
+
+const DbTypeSchema = t.Union([
+  t.Literal('sqlserver'),
+  t.Literal('postgres'),
+  t.Literal('sqlite'),
+])
 
 export const connectionsRouter = new Elysia({ prefix: '/api/connections' })
   .get('/', () => readConfig().connections)
@@ -17,19 +23,23 @@ export const connectionsRouter = new Elysia({ prefix: '/api/connections' })
   }, {
     body: t.Object({
       name: t.String(),
-      connectionString: t.String()
+      connectionString: t.String(),
+      type: DbTypeSchema,
     })
   })
 
   .post('/test', async ({ body }) => {
     try {
-      await testConnection(body.connectionString)
+      await getAdapter(body.type).testConnection(body.connectionString)
       return { ok: true }
     } catch (err) {
       return { ok: false, error: err instanceof Error ? err.message : String(err) }
     }
   }, {
-    body: t.Object({ connectionString: t.String() })
+    body: t.Object({
+      connectionString: t.String(),
+      type: DbTypeSchema,
+    })
   })
 
   .delete('/:name', ({ params }) => {

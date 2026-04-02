@@ -1,5 +1,7 @@
 // src/types.ts
 
+export type DbType = 'sqlserver' | 'postgres' | 'sqlite'
+
 export interface Column {
   name: string
   dataType: string
@@ -34,6 +36,7 @@ export interface SchemaData {
 export interface Connection {
   name: string
   connectionString: string
+  type: DbType
 }
 
 export interface Group {
