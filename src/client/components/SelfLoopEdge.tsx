@@ -9,7 +9,7 @@ export function SelfLoopEdge({ id, source, style, label, markerEnd }: EdgeProps)
   const y = node.internals.positionAbsolute.y + (node.measured?.height ?? 80) / 2
 
   // Bezier loop off the right side of the node
-  const path = `M ${x} ${y - 14} C ${x + 70} ${y - 60}, ${x + 70} ${y + 60}, ${x} ${y + 14}`
+  const path = `M ${x} ${y - 8} C ${x + 40} ${y - 32}, ${x + 40} ${y + 32}, ${x} ${y + 8}`
 
   return (
     <BaseEdge
@@ -18,7 +18,7 @@ export function SelfLoopEdge({ id, source, style, label, markerEnd }: EdgeProps)
       style={style}
       markerEnd={markerEnd}
       label={label}
-      labelX={x + 76}
+      labelX={x + 44}
       labelY={y}
     />
   )
