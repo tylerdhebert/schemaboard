@@ -8,7 +8,7 @@ export type RawColumn = {
   maxLength: number | null
   numericPrecision: number | null
   numericScale: number | null
-  isNullable: string
+  isNullable: 'YES' | 'NO'
   defaultValue: string | null
 }
 export type RawPK = { schema: string; tableName: string; columnName: string }
@@ -55,6 +55,9 @@ export function buildSchemaData(
     tableMap.get(key)!.columns.push(column)
   }
 
+  // ForeignKey intentionally omits schema fields — the frontend resolves FK relationships
+  // by unqualified table name via tableByName Map lookups. Acceptable because table names
+  // are unique across schemas in practice; multi-schema same-name tables are not supported.
   const foreignKeys: ForeignKey[] = rawFKs.map(fk => ({
     parentTable: fk.parentTable,
     parentColumn: fk.parentColumn,

@@ -12,8 +12,7 @@ SELECT
   c.NUMERIC_PRECISION        AS numericPrecision,
   c.NUMERIC_SCALE            AS numericScale,
   c.IS_NULLABLE              AS isNullable,
-  c.COLUMN_DEFAULT           AS defaultValue,
-  c.ORDINAL_POSITION         AS ordinal
+  c.COLUMN_DEFAULT           AS defaultValue
 FROM INFORMATION_SCHEMA.TABLES t
 JOIN INFORMATION_SCHEMA.COLUMNS c
   ON t.TABLE_NAME = c.TABLE_NAME AND t.TABLE_SCHEMA = c.TABLE_SCHEMA
@@ -29,6 +28,7 @@ SELECT
 FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS tc
 JOIN INFORMATION_SCHEMA.CONSTRAINT_COLUMN_USAGE ccu
   ON tc.CONSTRAINT_NAME = ccu.CONSTRAINT_NAME
+  AND tc.TABLE_SCHEMA = ccu.TABLE_SCHEMA
 WHERE tc.CONSTRAINT_TYPE = 'PRIMARY KEY'
 `
 
@@ -61,8 +61,9 @@ export const sqlServerAdapter: DbAdapter = {
   },
 
   async fetchSchema(connectionString) {
-    const pool = await sql.connect(connectionString)
+    let pool: sql.ConnectionPool | undefined
     try {
+      pool = await sql.connect(connectionString)
       const [colResult, pkResult, fkResult] = await Promise.all([
         pool.request().query(COLUMNS_QUERY),
         pool.request().query(PKS_QUERY),
@@ -70,7 +71,7 @@ export const sqlServerAdapter: DbAdapter = {
       ])
       return buildSchemaData(colResult.recordset, pkResult.recordset, fkResult.recordset)
     } finally {
-      await pool.close()
+      await pool?.close()
     }
   },
 }
