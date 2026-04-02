@@ -33,10 +33,12 @@ WHERE tc.CONSTRAINT_TYPE = 'PRIMARY KEY'
 
 const FKS_QUERY = `
 SELECT
-  tp.name AS parentTable,
-  cp.name AS parentColumn,
-  tr.name AS referencedTable,
-  cr.name AS referencedColumn
+  SCHEMA_NAME(tp.schema_id) AS parentSchema,
+  tp.name                   AS parentTable,
+  cp.name                   AS parentColumn,
+  SCHEMA_NAME(tr.schema_id) AS referencedSchema,
+  tr.name                   AS referencedTable,
+  cr.name                   AS referencedColumn
 FROM sys.foreign_keys fk
 JOIN sys.foreign_key_columns fkc ON fk.object_id = fkc.constraint_object_id
 JOIN sys.tables tp ON fkc.parent_object_id = tp.object_id
@@ -48,22 +50,35 @@ JOIN sys.columns cr
 `
 
 type RawColumn = {
-  schema: string; tableName: string; columnName: string
-  dataType: string; maxLength: number | null
-  numericPrecision: number | null; numericScale: number | null
-  isNullable: string; defaultValue: string | null
+  schema: string
+  tableName: string
+  columnName: string
+  dataType: string
+  maxLength: number | null
+  numericPrecision: number | null
+  numericScale: number | null
+  isNullable: string
+  defaultValue: string | null
 }
 type RawPK = { schema: string; tableName: string; columnName: string }
-type RawFK = { parentTable: string; parentColumn: string; referencedTable: string; referencedColumn: string }
+type RawFK = {
+  parentSchema: string
+  parentTable: string
+  parentColumn: string
+  referencedSchema: string
+  referencedTable: string
+  referencedColumn: string
+}
 
 export function buildSchemaData(
   rawColumns: RawColumn[],
   rawPKs: RawPK[],
   rawFKs: RawFK[]
 ): SchemaData {
-  const pkSet = new Set(rawPKs.map(pk => `${pk.tableName}.${pk.columnName}`))
+  // Schema-qualified keys prevent collisions when same table name exists in multiple schemas
+  const pkSet = new Set(rawPKs.map(pk => `${pk.schema}.${pk.tableName}.${pk.columnName}`))
   const fkMap = new Map(rawFKs.map(fk => [
-    `${fk.parentTable}.${fk.parentColumn}`,
+    `${fk.parentSchema}.${fk.parentTable}.${fk.parentColumn}`,
     { referencesTable: fk.referencedTable, referencesColumn: fk.referencedColumn }
   ]))
 
@@ -74,7 +89,7 @@ export function buildSchemaData(
     if (!tableMap.has(key)) {
       tableMap.set(key, { schema: row.schema, name: row.tableName, columns: [] })
     }
-    const fkInfo = fkMap.get(`${row.tableName}.${row.columnName}`)
+    const fkInfo = fkMap.get(`${row.schema}.${row.tableName}.${row.columnName}`)
     const column: Column = {
       name: row.columnName,
       dataType: row.dataType,
@@ -82,7 +97,7 @@ export function buildSchemaData(
       numericPrecision: row.numericPrecision,
       numericScale: row.numericScale,
       isNullable: row.isNullable === 'YES',
-      isPK: pkSet.has(`${row.tableName}.${row.columnName}`),
+      isPK: pkSet.has(`${row.schema}.${row.tableName}.${row.columnName}`),
       isFK: !!fkInfo,
       referencesTable: fkInfo?.referencesTable ?? null,
       referencesColumn: fkInfo?.referencesColumn ?? null,
@@ -90,9 +105,17 @@ export function buildSchemaData(
     tableMap.get(key)!.columns.push(column)
   }
 
+  // Map RawFK to ForeignKey (dropping schema fields not in the public type)
+  const foreignKeys: ForeignKey[] = rawFKs.map(fk => ({
+    parentTable: fk.parentTable,
+    parentColumn: fk.parentColumn,
+    referencedTable: fk.referencedTable,
+    referencedColumn: fk.referencedColumn,
+  }))
+
   return {
     tables: Array.from(tableMap.values()),
-    foreignKeys: rawFKs
+    foreignKeys,
   }
 }
 
@@ -111,6 +134,10 @@ export async function fetchSchema(connectionString: string): Promise<SchemaData>
 }
 
 export async function testConnection(connectionString: string): Promise<void> {
-  const pool = await sql.connect(connectionString)
-  await pool.close()
+  try {
+    const pool = await sql.connect(connectionString)
+    await pool.close()
+  } catch (err) {
+    throw new Error(`Connection failed: ${err instanceof Error ? err.message : String(err)}`)
+  }
 }

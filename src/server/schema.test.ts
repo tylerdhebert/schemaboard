@@ -9,8 +9,8 @@ describe('buildSchemaData', () => {
     ]
     const rawPKs = [{ schema: 'dbo', tableName: 'Orders', columnName: 'Id' }]
     const rawFKs = [{
-      parentTable: 'Orders', parentColumn: 'CustomerId',
-      referencedTable: 'Customers', referencedColumn: 'Id'
+      parentSchema: 'dbo', parentTable: 'Orders', parentColumn: 'CustomerId',
+      referencedSchema: 'dbo', referencedTable: 'Customers', referencedColumn: 'Id'
     }]
 
     const result = buildSchemaData(rawColumns, rawPKs, rawFKs)
