@@ -1,0 +1,34 @@
+{
+  "name": "schemaboard",
+  "version": "0.1.0",
+  "scripts": {
+    "dev:server": "bun --watch src/server/index.ts",
+    "dev:client": "vite",
+    "dev": "concurrently \"bun run dev:server\" \"bun run dev:client\"",
+    "build": "vite build",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@elysiajs/eden": "^1.2.0",
+    "@dagrejs/dagre": "^1.1.4",
+    "@tanstack/react-query": "^5.62.0",
+    "@xyflow/react": "^12.3.6",
+    "elysia": "^1.2.0",
+    "mssql": "^11.0.1",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "zustand": "^5.0.3"
+  },
+  "devDependencies": {
+    "@types/mssql": "^9.1.5",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "bun-types": "latest",
+    "concurrently": "^9.1.2",
+    "tailwindcss": "^4.0.0",
+    "@tailwindcss/vite": "^4.0.0",
+    "typescript": "^5.7.0",
+    "vite": "^6.0.0"
+  }
+}

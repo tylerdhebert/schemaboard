@@ -1,0 +1,16 @@
+{
+  "connections": [
+    {
+      "name": "Local Dev",
+      "connectionString": "Server=localhost;Database=MyDb;User Id=sa;Password=yourpassword;TrustServerCertificate=true"
+    }
+  ],
+  "groups": [
+    {
+      "id": "g1",
+      "name": "Orders",
+      "color": "#3B82F6",
+      "tables": ["Orders", "OrderItems"]
+    }
+  ]
+}
