@@ -19,10 +19,13 @@ export const groupsRouter = new Elysia({ prefix: '/api/groups' })
     })
   })
 
-  .put('/:id', ({ params, body }) => {
+  .put('/:id', ({ params, body, set }) => {
     const config = readConfig()
     const idx = config.groups.findIndex(g => g.id === params.id)
-    if (idx === -1) throw new Error('Group not found')
+    if (idx === -1) {
+      set.status = 404
+      return { error: 'Group not found' }
+    }
     config.groups[idx] = { ...config.groups[idx], ...body }
     writeConfig(config)
     return config.groups[idx]

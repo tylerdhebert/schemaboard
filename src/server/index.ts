@@ -7,8 +7,9 @@ const app = new Elysia()
   .use(connectionsRouter)
   .use(groupsRouter)
   .use(schemaRouter)
-  .listen(3777)
+  .listen(process.env.SERVER_PORT ?? 3777)
 
-console.log('schemaboard server running on http://localhost:3777')
+const { hostname, port } = app.server!
+console.log(`schemaboard server running on http://${hostname}:${port}`)
 
 export type App = typeof app
