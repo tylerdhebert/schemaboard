@@ -45,12 +45,27 @@ export function Header({ connections, onRefresh }: HeaderProps) {
           }}
         >
           <option value="" disabled>Select connection…</option>
+          <option value="__demo__" style={{ color: 'var(--sel)' }}>Demo Mode</option>
           {connections.map(c => (
             <option key={c.name} value={c.name}>{c.name}</option>
           ))}
         </select>
 
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button
+            onClick={() => setActiveConnection('__demo__')}
+            style={{
+              padding: '7px 13px', background: 'transparent',
+              border: `1px solid var(--sel)`,
+              borderRadius: 'var(--r-sm)',
+              color: 'var(--sel)',
+              cursor: 'pointer', fontFamily: 'inherit',
+              fontSize: 13, fontWeight: 600,
+              opacity: activeConnection === '__demo__' ? 0.5 : 1,
+            }}
+          >
+            Load Demo
+          </button>
           <button
             onClick={onRefresh}
             style={{

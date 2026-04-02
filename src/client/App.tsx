@@ -39,6 +39,11 @@ export function App() {
     queryKey: ['schema', activeConnection],
     enabled: !!activeConnection,
     queryFn: async () => {
+      if (activeConnection === '__demo__') {
+        const res = await api.api.schema.demo.get()
+        if (res.error) throw res.error
+        return (res.data as SchemaData) ?? EMPTY_SCHEMA
+      }
       const res = await api.api.schema.get({ query: { connection: activeConnection! } })
       if (res.error) throw res.error
       return (res.data as SchemaData) ?? EMPTY_SCHEMA
