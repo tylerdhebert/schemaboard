@@ -1,0 +1,66 @@
+import type { SchemaData, SchemaTable, Column, ForeignKey } from '../../types'
+
+export type RawColumn = {
+  schema: string
+  tableName: string
+  columnName: string
+  dataType: string
+  maxLength: number | null
+  numericPrecision: number | null
+  numericScale: number | null
+  isNullable: string
+  defaultValue: string | null
+}
+export type RawPK = { schema: string; tableName: string; columnName: string }
+export type RawFK = {
+  parentSchema: string
+  parentTable: string
+  parentColumn: string
+  referencedSchema: string
+  referencedTable: string
+  referencedColumn: string
+}
+
+export function buildSchemaData(
+  rawColumns: RawColumn[],
+  rawPKs: RawPK[],
+  rawFKs: RawFK[]
+): SchemaData {
+  const pkSet = new Set(rawPKs.map(pk => `${pk.schema}.${pk.tableName}.${pk.columnName}`))
+  const fkMap = new Map(rawFKs.map(fk => [
+    `${fk.parentSchema}.${fk.parentTable}.${fk.parentColumn}`,
+    { referencesTable: fk.referencedTable, referencesColumn: fk.referencedColumn }
+  ]))
+
+  const tableMap = new Map<string, SchemaTable>()
+
+  for (const row of rawColumns) {
+    const key = `${row.schema}.${row.tableName}`
+    if (!tableMap.has(key)) {
+      tableMap.set(key, { schema: row.schema, name: row.tableName, columns: [] })
+    }
+    const fkInfo = fkMap.get(`${row.schema}.${row.tableName}.${row.columnName}`)
+    const column: Column = {
+      name: row.columnName,
+      dataType: row.dataType,
+      maxLength: row.maxLength,
+      numericPrecision: row.numericPrecision,
+      numericScale: row.numericScale,
+      isNullable: row.isNullable === 'YES',
+      isPK: pkSet.has(`${row.schema}.${row.tableName}.${row.columnName}`),
+      isFK: !!fkInfo,
+      referencesTable: fkInfo?.referencesTable ?? null,
+      referencesColumn: fkInfo?.referencesColumn ?? null,
+    }
+    tableMap.get(key)!.columns.push(column)
+  }
+
+  const foreignKeys: ForeignKey[] = rawFKs.map(fk => ({
+    parentTable: fk.parentTable,
+    parentColumn: fk.parentColumn,
+    referencedTable: fk.referencedTable,
+    referencedColumn: fk.referencedColumn,
+  }))
+
+  return { tables: Array.from(tableMap.values()), foreignKeys }
+}

@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'bun:test'
-import { buildSchemaData } from './schema'
+import { buildSchemaData } from './adapters/shared'
 
 describe('buildSchemaData', () => {
   test('merges raw rows into structured SchemaData', () => {
