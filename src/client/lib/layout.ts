@@ -14,20 +14,28 @@ export function buildLayout(
   graph.setDefaultEdgeLabel(() => ({}))
   graph.setGraph({ rankdir: 'LR', ranksep: 80, nodesep: 40 })
 
+  // Store computed heights so we reuse the exact same value for position centering
+  const nodeHeights = new Map<string, number>()
+
   for (const table of tables) {
+    const nodeId = `${table.schema}.${table.name}`
     const height = NODE_HEIGHT_BASE + table.columns.length * ROW_HEIGHT + 16
-    graph.setNode(`${table.schema}.${table.name}`, { width: NODE_WIDTH, height })
+    nodeHeights.set(nodeId, height)
+    graph.setNode(nodeId, { width: NODE_WIDTH, height })
   }
 
-  const tableNames = new Set(tables.map(t => t.name))
+  // Use schema-qualified ids for matching to avoid collisions across schemas
+  const nodeIds = new Set(tables.map(t => `${t.schema}.${t.name}`))
+  const tableByName = new Map(tables.map(t => [t.name, t]))
+
   for (const fk of foreignKeys) {
-    if (!tableNames.has(fk.parentTable) || !tableNames.has(fk.referencedTable)) continue
-    const parentTable = tables.find(t => t.name === fk.parentTable)!
-    const refTable = tables.find(t => t.name === fk.referencedTable)!
-    graph.setEdge(
-      `${parentTable.schema}.${parentTable.name}`,
-      `${refTable.schema}.${refTable.name}`
-    )
+    const parentTable = tableByName.get(fk.parentTable)
+    const refTable = tableByName.get(fk.referencedTable)
+    if (!parentTable || !refTable) continue
+    const sourceId = `${parentTable.schema}.${parentTable.name}`
+    const targetId = `${refTable.schema}.${refTable.name}`
+    if (!nodeIds.has(sourceId) || !nodeIds.has(targetId)) continue
+    graph.setEdge(sourceId, targetId)
   }
 
   dagre.layout(graph)
@@ -35,10 +43,11 @@ export function buildLayout(
   const nodes: Node[] = tables.map(table => {
     const nodeId = `${table.schema}.${table.name}`
     const pos = graph.node(nodeId)
+    const height = nodeHeights.get(nodeId)!
     return {
       id: nodeId,
       type: 'tableNode',
-      position: { x: pos.x - NODE_WIDTH / 2, y: pos.y - pos.height / 2 },
+      position: { x: pos.x - NODE_WIDTH / 2, y: pos.y - height / 2 },
       data: { table }
     }
   })
@@ -47,16 +56,22 @@ export function buildLayout(
   const edges: Edge[] = []
 
   for (const fk of foreignKeys) {
-    if (!tableNames.has(fk.parentTable) || !tableNames.has(fk.referencedTable)) continue
-    const parentTable = tables.find(t => t.name === fk.parentTable)!
-    const refTable = tables.find(t => t.name === fk.referencedTable)!
-    const edgeId = `${parentTable.schema}.${parentTable.name}->${refTable.schema}.${refTable.name}-${fk.parentColumn}`
+    const parentTable = tableByName.get(fk.parentTable)
+    const refTable = tableByName.get(fk.referencedTable)
+    if (!parentTable || !refTable) continue
+    const sourceId = `${parentTable.schema}.${parentTable.name}`
+    const targetId = `${refTable.schema}.${refTable.name}`
+    if (!nodeIds.has(sourceId) || !nodeIds.has(targetId)) continue
+
+    // Include both columns in dedup key to preserve composite FK scenarios
+    const edgeId = `${sourceId}->${targetId}-${fk.parentColumn}-${fk.referencedColumn}`
     if (seenEdges.has(edgeId)) continue
     seenEdges.add(edgeId)
+
     edges.push({
       id: edgeId,
-      source: `${parentTable.schema}.${parentTable.name}`,
-      target: `${refTable.schema}.${refTable.name}`,
+      source: sourceId,
+      target: targetId,
       label: fk.parentColumn,
       type: 'smoothstep',
       style: { strokeDasharray: '5 3' }
