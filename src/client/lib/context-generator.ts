@@ -2,10 +2,12 @@ import type { SchemaTable, ForeignKey, Column } from '../../types'
 
 function formatType(col: Column): string {
   if (['nvarchar', 'varchar', 'char', 'nchar'].includes(col.dataType)) {
+    if (col.maxLength == null) return col.dataType
     const len = col.maxLength === -1 ? 'max' : col.maxLength
     return `${col.dataType}(${len})`
   }
   if (['decimal', 'numeric'].includes(col.dataType)) {
+    if (col.numericPrecision == null || col.numericScale == null) return col.dataType
     return `${col.dataType}(${col.numericPrecision},${col.numericScale})`
   }
   return col.dataType
@@ -13,9 +15,7 @@ function formatType(col: Column): string {
 
 export function generateCondensed(tables: SchemaTable[], foreignKeys: ForeignKey[]): string {
   const relevantTableNames = new Set(tables.map(t => t.name))
-  const relevantFKs = foreignKeys.filter(
-    fk => relevantTableNames.has(fk.parentTable)
-  )
+  const relevantFKs = foreignKeys.filter(fk => relevantTableNames.has(fk.parentTable))
 
   const tableLines = tables.map(table => {
     const cols = table.columns.map(col => {
@@ -37,8 +37,18 @@ export function generateCondensed(tables: SchemaTable[], foreignKeys: ForeignKey
 }
 
 export function generateDDL(tables: SchemaTable[], foreignKeys: ForeignKey[]): string {
+  // Build schema-qualified FK lookup: "parentSchema.parentTable.parentColumn" → fk + refSchema
+  const tableByName = new Map(tables.map(t => [t.name, t]))
+
   const fkMap = new Map(
-    foreignKeys.map(fk => [`${fk.parentTable}.${fk.parentColumn}`, fk])
+    foreignKeys.map(fk => {
+      const parentTable = tableByName.get(fk.parentTable)
+      const refTable = tableByName.get(fk.referencedTable)
+      const key = parentTable
+        ? `${parentTable.schema}.${fk.parentTable}.${fk.parentColumn}`
+        : `${fk.parentTable}.${fk.parentColumn}`
+      return [key, { fk, refSchema: refTable?.schema ?? 'dbo' }]
+    })
   )
 
   return tables.map(table => {
@@ -46,8 +56,10 @@ export function generateDDL(tables: SchemaTable[], foreignKeys: ForeignKey[]): s
       const type = formatType(col)
       const nullable = col.isNullable ? 'NULL' : 'NOT NULL'
       const pk = col.isPK ? ' PRIMARY KEY' : ''
-      const fk = fkMap.get(`${table.name}.${col.name}`)
-      const ref = fk ? ` REFERENCES dbo.${fk.referencedTable}(${fk.referencedColumn})` : ''
+      const entry = fkMap.get(`${table.schema}.${table.name}.${col.name}`)
+      const ref = entry
+        ? ` REFERENCES ${entry.refSchema}.${entry.fk.referencedTable}(${entry.fk.referencedColumn})`
+        : ''
       return `  ${col.name} ${type} ${nullable}${pk}${ref}`
     })
     return `CREATE TABLE ${table.schema}.${table.name} (\n${colDefs.join(',\n')}\n)`
