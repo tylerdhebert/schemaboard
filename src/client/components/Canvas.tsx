@@ -93,8 +93,14 @@ export function Canvas({ schemaData, groups }: CanvasProps) {
   const [rfNodes, setRfNodes, onNodesChange] = useNodesState(enrichedNodes)
   const [rfEdges, setRfEdges, onEdgesChange] = useEdgesState(enrichedEdges)
 
-  // Sync enriched nodes/edges into React Flow state when upstream data changes
-  useEffect(() => { setRfNodes(enrichedNodes) }, [enrichedNodes, setRfNodes])
+  // Sync enriched nodes/edges into React Flow state when upstream data changes.
+  // Preserve user-dragged positions — only use layout positions for nodes not yet in RF state.
+  useEffect(() => {
+    setRfNodes(prev => {
+      const posMap = new Map(prev.map(n => [n.id, n.position]))
+      return enrichedNodes.map(n => ({ ...n, position: posMap.get(n.id) ?? n.position }))
+    })
+  }, [enrichedNodes, setRfNodes])
   useEffect(() => { setRfEdges(enrichedEdges) }, [enrichedEdges, setRfEdges])
 
   const onNodeClick: NodeMouseHandler = useCallback((_evt, node) => {
