@@ -6,6 +6,7 @@ interface AppState {
   hiddenGroups: Set<string>
   autoExpand: boolean
   format: 'condensed' | 'ddl'
+  zoomToTable: string | null
   setActiveConnection: (name: string) => void
   toggleTable: (id: string) => void
   selectTables: (ids: string[]) => void
@@ -13,6 +14,7 @@ interface AppState {
   toggleGroupVisibility: (groupId: string) => void
   setAutoExpand: (v: boolean) => void
   setFormat: (f: 'condensed' | 'ddl') => void
+  setZoomToTable: (id: string | null) => void
 }
 
 export const useStore = create<AppState>((set) => ({
@@ -21,6 +23,7 @@ export const useStore = create<AppState>((set) => ({
   hiddenGroups: new Set(),
   autoExpand: true,
   format: 'condensed',
+  zoomToTable: null,
 
   setActiveConnection: (name) => set({ activeConnection: name, selectedTables: new Set() }),
 
@@ -46,4 +49,5 @@ export const useStore = create<AppState>((set) => ({
 
   setAutoExpand: (autoExpand) => set({ autoExpand }),
   setFormat: (format) => set({ format }),
+  setZoomToTable: (zoomToTable) => set({ zoomToTable }),
 }))

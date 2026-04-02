@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useStore } from '../store'
 import type { SchemaData, Group } from '../../types'
 
@@ -11,7 +11,15 @@ interface SidebarProps {
 
 export function Sidebar({ schemaData, groups, onSelectGroup, onAddGroup }: SidebarProps) {
   const [search, setSearch] = useState('')
-  const { selectedTables, hiddenGroups, autoExpand, toggleTable, selectTables, toggleGroupVisibility } = useStore()
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; nodeId: string } | null>(null)
+  const { selectedTables, hiddenGroups, autoExpand, toggleTable, selectTables, toggleGroupVisibility, setZoomToTable } = useStore()
+
+  useEffect(() => {
+    if (!ctxMenu) return
+    const close = () => setCtxMenu(null)
+    window.addEventListener('click', close)
+    return () => window.removeEventListener('click', close)
+  }, [ctxMenu])
 
   const tableToGroup = useMemo(() => {
     const map = new Map<string, Group>()
@@ -112,6 +120,28 @@ export function Sidebar({ schemaData, groups, onSelectGroup, onAddGroup }: Sideb
 
       {/* Table list */}
       <div style={{ flex: 1, overflowY: 'auto', padding: 6 }}>
+        {ctxMenu && (
+          <div
+            style={{
+              position: 'fixed', left: ctxMenu.x, top: ctxMenu.y, zIndex: 200,
+              background: 'var(--surface)', border: '1px solid var(--border)',
+              borderRadius: 'var(--r-sm)', boxShadow: 'var(--shadow-lg)',
+              overflow: 'hidden', minWidth: 130,
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div
+              onClick={() => { setZoomToTable(ctxMenu.nodeId); setCtxMenu(null) }}
+              style={{
+                padding: '8px 14px', fontSize: 13, cursor: 'pointer',
+                color: 'var(--text-1)', fontWeight: 500,
+              }}
+            >
+              Zoom to
+            </div>
+          </div>
+        )}
+
         {filtered.map(table => {
           const nodeId = `${table.schema}.${table.name}`
           const isSelected = selectedTables.has(nodeId)
@@ -119,6 +149,7 @@ export function Sidebar({ schemaData, groups, onSelectGroup, onAddGroup }: Sideb
           return (
             <div
               key={nodeId}
+              onContextMenu={e => { e.preventDefault(); e.stopPropagation(); setCtxMenu({ x: e.clientX, y: e.clientY, nodeId }) }}
               onClick={() => {
                 const wasSelected = selectedTables.has(nodeId)
                 toggleTable(nodeId)

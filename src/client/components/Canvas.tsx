@@ -6,6 +6,7 @@ import {
   ReactFlow,
   useNodesState,
   useEdgesState,
+  useReactFlow,
   type NodeMouseHandler,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
@@ -17,6 +18,17 @@ import type { SchemaData, Group } from '../../types'
 
 const nodeTypes = { tableNode: TableNode }
 const edgeTypes = { selfloop: SelfLoopEdge }
+
+function ZoomController() {
+  const { zoomToTable, setZoomToTable } = useStore()
+  const { fitView } = useReactFlow()
+  useEffect(() => {
+    if (!zoomToTable) return
+    fitView({ nodes: [{ id: zoomToTable }], duration: 500, padding: 0.4 })
+    setZoomToTable(null)
+  }, [zoomToTable, fitView, setZoomToTable])
+  return null
+}
 
 interface CanvasProps {
   schemaData: SchemaData
@@ -133,7 +145,9 @@ export function Canvas({ schemaData, groups }: CanvasProps) {
         minZoom={0.15}
         maxZoom={2}
         proOptions={{ hideAttribution: true }}
-      />
+      >
+        <ZoomController />
+      </ReactFlow>
 
     </div>
   )
