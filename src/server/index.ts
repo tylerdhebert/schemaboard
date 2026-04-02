@@ -1,9 +1,11 @@
 import { Elysia } from 'elysia'
+import { cors } from '@elysiajs/cors'
 import { connectionsRouter } from './routes/connections'
 import { groupsRouter } from './routes/groups'
 import { schemaRouter } from './routes/schema'
 
 const app = new Elysia()
+  .use(cors())
   .use(connectionsRouter)
   .use(groupsRouter)
   .use(schemaRouter)
