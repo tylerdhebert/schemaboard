@@ -4,19 +4,19 @@ const EDGE_ACTIVE_STROKE = 'rgba(74,123,245,0.5)'
 const EDGE_DIM_STROKE = 'rgba(255,255,255,0.06)'
 import {
   ReactFlow,
-  Background,
-  BackgroundVariant,
   useNodesState,
   useEdgesState,
   type NodeMouseHandler,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { TableNode } from './TableNode'
+import { SelfLoopEdge } from './SelfLoopEdge'
 import { buildLayout } from '../lib/layout'
 import { useStore } from '../store'
 import type { SchemaData, Group } from '../../types'
 
 const nodeTypes = { tableNode: TableNode }
+const edgeTypes = { selfloop: SelfLoopEdge }
 
 interface CanvasProps {
   schemaData: SchemaData
@@ -98,19 +98,22 @@ export function Canvas({ schemaData, groups }: CanvasProps) {
   useEffect(() => { setRfEdges(enrichedEdges) }, [enrichedEdges, setRfEdges])
 
   const onNodeClick: NodeMouseHandler = useCallback((_evt, node) => {
+    const wasSelected = selectedTables.has(node.id)
     toggleTable(node.id)
 
-    if (autoExpand) {
-      // fkNeighbors is keyed by qualified node ID — look up directly
+    if (!wasSelected && autoExpand) {
       const neighbors = fkNeighbors.get(node.id)
-      if (neighbors) {
-        selectTables([node.id, ...neighbors])
-      }
+      if (neighbors) selectTables([node.id, ...neighbors])
     }
-  }, [toggleTable, autoExpand, fkNeighbors, selectTables])
+  }, [toggleTable, autoExpand, fkNeighbors, selectTables, selectedTables])
 
   return (
-    <div style={{ width: '100%', height: '100%', background: 'var(--canvas)' }}>
+    <div style={{
+      width: '100%', height: '100%',
+      background: 'var(--canvas)',
+      backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.07) 1px, transparent 1px)',
+      backgroundSize: '22px 22px',
+    }}>
       <ReactFlow
         nodes={rfNodes}
         edges={rfEdges}
@@ -118,19 +121,14 @@ export function Canvas({ schemaData, groups }: CanvasProps) {
         onEdgesChange={onEdgesChange}
         onNodeClick={onNodeClick}
         nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
         fitView
         fitViewOptions={{ padding: 0.15 }}
         minZoom={0.15}
         maxZoom={2}
         proOptions={{ hideAttribution: true }}
-      >
-        <Background
-          variant={BackgroundVariant.Dots}
-          color="rgba(255,255,255,0.07)"
-          gap={22}
-          size={1}
-        />
-      </ReactFlow>
+      />
+
     </div>
   )
 }

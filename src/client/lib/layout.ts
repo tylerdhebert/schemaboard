@@ -73,7 +73,7 @@ export function buildLayout(
       source: sourceId,
       target: targetId,
       label: fk.parentColumn,
-      type: 'smoothstep',
+      type: sourceId === targetId ? 'selfloop' : 'smoothstep',
       style: { strokeDasharray: '5 3' }
     })
   }

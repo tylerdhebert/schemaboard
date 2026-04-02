@@ -11,7 +11,7 @@ interface SidebarProps {
 
 export function Sidebar({ schemaData, groups, onSelectGroup, onAddGroup }: SidebarProps) {
   const [search, setSearch] = useState('')
-  const { selectedTables, hiddenGroups, toggleTable, toggleGroupVisibility } = useStore()
+  const { selectedTables, hiddenGroups, autoExpand, toggleTable, selectTables, toggleGroupVisibility } = useStore()
 
   const tableToGroup = useMemo(() => {
     const map = new Map<string, Group>()
@@ -119,7 +119,24 @@ export function Sidebar({ schemaData, groups, onSelectGroup, onAddGroup }: Sideb
           return (
             <div
               key={nodeId}
-              onClick={() => toggleTable(nodeId)}
+              onClick={() => {
+                const wasSelected = selectedTables.has(nodeId)
+                toggleTable(nodeId)
+                if (!wasSelected && autoExpand) {
+                  const tableByName = new Map(schemaData.tables.map(t => [t.name, t]))
+                  const neighbors: string[] = []
+                  for (const fk of schemaData.foreignKeys) {
+                    const p = tableByName.get(fk.parentTable)
+                    const r = tableByName.get(fk.referencedTable)
+                    if (!p || !r) continue
+                    const pId = `${p.schema}.${p.name}`
+                    const rId = `${r.schema}.${r.name}`
+                    if (pId === nodeId) neighbors.push(rId)
+                    else if (rId === nodeId) neighbors.push(pId)
+                  }
+                  if (neighbors.length) selectTables([nodeId, ...neighbors])
+                }
+              }}
               style={{
                 display: 'flex', alignItems: 'center', gap: 7,
                 padding: '6px 9px', borderRadius: 'var(--r-sm)',
