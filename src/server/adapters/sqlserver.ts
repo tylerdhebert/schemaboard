@@ -50,10 +50,57 @@ JOIN sys.columns cr
   ON fkc.referenced_object_id = cr.object_id AND fkc.referenced_column_id = cr.column_id
 `
 
+// --- Windows auth helpers ---
+
+function normKey(k: string) {
+  return k.toLowerCase().replace(/[\s_]/g, '')
+}
+
+function parseConnStr(connStr: string): Record<string, string> {
+  const map: Record<string, string> = {}
+  for (const segment of connStr.split(';')) {
+    const eq = segment.indexOf('=')
+    if (eq === -1) continue
+    const k = normKey(segment.slice(0, eq).trim())
+    const v = segment.slice(eq + 1).trim()
+    if (k) map[k] = v
+  }
+  return map
+}
+
+function isWindowsAuth(parts: Record<string, string>): boolean {
+  const val = (parts['integratedsecurity'] ?? parts['trustedconnection'] ?? '').toLowerCase()
+  return val === 'true' || val === 'yes' || val === 'sspi'
+}
+
+function buildWindowsConfig(parts: Record<string, string>): sql.config {
+  const server = parts['datasource'] ?? parts['server'] ?? parts['address'] ?? parts['addr'] ?? ''
+  const database = parts['initialcatalog'] ?? parts['database'] ?? ''
+  const trustCert = ['true', 'yes'].includes((parts['trustservercertificate'] ?? '').toLowerCase())
+  return {
+    server,
+    database,
+    options: { trustedConnection: true, trustServerCertificate: trustCert },
+  }
+}
+
+// Returns an mssql ConnectionPool, using msnodesqlv8 (ODBC/SSPI) for Windows auth
+// and tedious for standard SQL auth.
+async function connect(connectionString: string): Promise<sql.ConnectionPool> {
+  const parts = parseConnStr(connectionString)
+  if (isWindowsAuth(parts)) {
+    const sqlWin = (await import('mssql/msnodesqlv8')).default as typeof sql
+    return sqlWin.connect(buildWindowsConfig(parts))
+  }
+  return sql.connect(connectionString)
+}
+
+// ---
+
 export const sqlServerAdapter: DbAdapter = {
   async testConnection(connectionString) {
     try {
-      const pool = await sql.connect(connectionString)
+      const pool = await connect(connectionString)
       await pool.close()
     } catch (err) {
       throw new Error(`Connection failed: ${err instanceof Error ? err.message : String(err)}`)
@@ -63,7 +110,7 @@ export const sqlServerAdapter: DbAdapter = {
   async listSchemas(connectionString) {
     let pool: sql.ConnectionPool | undefined
     try {
-      pool = await sql.connect(connectionString)
+      pool = await connect(connectionString)
       const result = await pool.request().query(
         `SELECT DISTINCT TABLE_SCHEMA AS [schema] FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE' ORDER BY TABLE_SCHEMA`
       )
@@ -76,7 +123,7 @@ export const sqlServerAdapter: DbAdapter = {
   async fetchSchema(connectionString, excludedSchemas) {
     let pool: sql.ConnectionPool | undefined
     try {
-      pool = await sql.connect(connectionString)
+      pool = await connect(connectionString)
       const [colResult, pkResult, fkResult] = await Promise.all([
         pool.request().query(COLUMNS_QUERY),
         pool.request().query(PKS_QUERY),
