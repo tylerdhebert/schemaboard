@@ -8,6 +8,7 @@ import {
   useEdgesState,
   useReactFlow,
   type NodeMouseHandler,
+  type Node,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { TableNode } from './TableNode'
@@ -21,12 +22,16 @@ const edgeTypes = { selfloop: SelfLoopEdge }
 
 function ZoomController() {
   const { zoomToTable, setZoomToTable } = useStore()
-  const { fitView } = useReactFlow()
+  const { getNode, setCenter } = useReactFlow()
   useEffect(() => {
     if (!zoomToTable) return
-    fitView({ nodes: [{ id: zoomToTable }], duration: 500, padding: 0.4 })
     setZoomToTable(null)
-  }, [zoomToTable, fitView, setZoomToTable])
+    const node = getNode(zoomToTable) as Node & { measured?: { width?: number; height?: number } } | undefined
+    if (!node) return
+    const w = node.measured?.width ?? 220
+    const h = node.measured?.height ?? 80
+    setCenter(node.position.x + w / 2, node.position.y + h / 2, { zoom: 1.5, duration: 500 })
+  }, [zoomToTable, getNode, setCenter, setZoomToTable])
   return null
 }
 
