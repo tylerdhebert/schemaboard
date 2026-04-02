@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useStore } from '../store'
 import type { SchemaData, Group } from '../../types'
 
@@ -13,10 +13,13 @@ export function Sidebar({ schemaData, groups, onSelectGroup, onAddGroup }: Sideb
   const [search, setSearch] = useState('')
   const { selectedTables, hiddenGroups, toggleTable, toggleGroupVisibility } = useStore()
 
-  const tableToGroup = new Map<string, Group>()
-  for (const group of groups) {
-    for (const tableName of group.tables) tableToGroup.set(tableName, group)
-  }
+  const tableToGroup = useMemo(() => {
+    const map = new Map<string, Group>()
+    for (const group of groups) {
+      for (const tableName of group.tables) map.set(tableName, group)
+    }
+    return map
+  }, [groups])
 
   const filtered = schemaData.tables.filter(t =>
     t.name.toLowerCase().includes(search.toLowerCase())

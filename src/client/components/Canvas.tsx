@@ -1,4 +1,7 @@
 import { useCallback, useMemo, useEffect } from 'react'
+
+const EDGE_ACTIVE_STROKE = 'rgba(74,123,245,0.5)'
+const EDGE_DIM_STROKE = 'rgba(255,255,255,0.06)'
 import {
   ReactFlow,
   Background,
@@ -39,17 +42,23 @@ export function Canvas({ schemaData, groups }: CanvasProps) {
     [schemaData.tables, tableToGroup, hiddenGroups]
   )
 
-  // Map tableName → Set of neighbor tableNames via FK relationships
+  // Keyed by qualified node ID ("schema.tableName") for consistent matching
   const fkNeighbors = useMemo(() => {
+    const tableByName = new Map(schemaData.tables.map(t => [t.name, t]))
     const map = new Map<string, Set<string>>()
     for (const fk of schemaData.foreignKeys) {
-      if (!map.has(fk.parentTable)) map.set(fk.parentTable, new Set())
-      if (!map.has(fk.referencedTable)) map.set(fk.referencedTable, new Set())
-      map.get(fk.parentTable)!.add(fk.referencedTable)
-      map.get(fk.referencedTable)!.add(fk.parentTable)
+      const parent = tableByName.get(fk.parentTable)
+      const ref = tableByName.get(fk.referencedTable)
+      if (!parent || !ref) continue
+      const parentId = `${parent.schema}.${parent.name}`
+      const refId = `${ref.schema}.${ref.name}`
+      if (!map.has(parentId)) map.set(parentId, new Set())
+      if (!map.has(refId)) map.set(refId, new Set())
+      map.get(parentId)!.add(refId)
+      map.get(refId)!.add(parentId)
     }
     return map
-  }, [schemaData.foreignKeys])
+  }, [schemaData.tables, schemaData.foreignKeys])
 
   const { nodes: layoutNodes, edges: layoutEdges } = useMemo(
     () => buildLayout(visibleTables, schemaData.foreignKeys),
@@ -74,7 +83,7 @@ export function Canvas({ schemaData, groups }: CanvasProps) {
       ...edge,
       style: {
         ...edge.style,
-        stroke: active ? 'rgba(74,123,245,0.5)' : 'rgba(255,255,255,0.06)',
+        stroke: active ? EDGE_ACTIVE_STROKE : EDGE_DIM_STROKE,
         strokeWidth: active ? 1.5 : 1,
       },
       animated: false,
@@ -92,18 +101,13 @@ export function Canvas({ schemaData, groups }: CanvasProps) {
     toggleTable(node.id)
 
     if (autoExpand) {
-      // node.id is "schema.tableName" — extract tableName for neighbor lookup
-      const tableName = node.id.split('.').slice(1).join('.')
-      const neighbors = fkNeighbors.get(tableName)
+      // fkNeighbors is keyed by qualified node ID — look up directly
+      const neighbors = fkNeighbors.get(node.id)
       if (neighbors) {
-        const neighborIds = [...neighbors]
-          .map(neighborName => schemaData.tables.find(t => t.name === neighborName))
-          .filter((t): t is NonNullable<typeof t> => t != null)
-          .map(t => `${t.schema}.${t.name}`)
-        selectTables([node.id, ...neighborIds])
+        selectTables([node.id, ...neighbors])
       }
     }
-  }, [toggleTable, autoExpand, fkNeighbors, schemaData.tables, selectTables])
+  }, [toggleTable, autoExpand, fkNeighbors, selectTables])
 
   return (
     <div style={{ flex: 1, background: 'var(--canvas)' }}>

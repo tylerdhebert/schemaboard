@@ -93,7 +93,7 @@ export function ContextPanel({ schemaData }: ContextPanelProps) {
           onClick={() => setAutoExpand(!autoExpand)}
           style={{
             width: 30, height: 17, borderRadius: 9,
-            background: autoExpand ? 'var(--accent)' : '#4A4238',
+            background: autoExpand ? 'var(--accent)' : 'var(--toggle-off)',
             position: 'relative', cursor: 'pointer', transition: 'background 0.18s',
             flexShrink: 0,
           }}

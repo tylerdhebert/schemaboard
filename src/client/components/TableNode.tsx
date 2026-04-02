@@ -69,13 +69,13 @@ export const TableNode = memo(function TableNode({ id, data }: TableNodeProps) {
             {col.isPK ? (
               <span style={{
                 fontSize: 8.5, fontWeight: 800, padding: '1.5px 4px', borderRadius: 3,
-                background: 'rgba(245,158,11,0.18)', color: '#FBBF24',
+                background: 'var(--pk-bg)', color: 'var(--pk-color)',
                 minWidth: 20, textAlign: 'center', flexShrink: 0,
               }}>PK</span>
             ) : col.isFK ? (
               <span style={{
                 fontSize: 8.5, fontWeight: 800, padding: '1.5px 4px', borderRadius: 3,
-                background: 'rgba(139,92,246,0.18)', color: '#A78BFA',
+                background: 'var(--fk-bg)', color: 'var(--fk-color)',
                 minWidth: 20, textAlign: 'center', flexShrink: 0,
               }}>FK</span>
             ) : (

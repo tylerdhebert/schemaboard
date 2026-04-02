@@ -17,6 +17,14 @@
   --canvas:        #1A1712;
   --shadow-md:     0 4px 16px rgba(0,0,0,0.4), 0 2px 6px rgba(0,0,0,0.25);
   --shadow-lg:     0 12px 40px rgba(0,0,0,0.55), 0 4px 12px rgba(0,0,0,0.35);
+  --pk-bg:         rgba(245,158,11,0.18);
+  --pk-color:      #FBBF24;
+  --fk-bg:         rgba(139,92,246,0.18);
+  --fk-color:      #A78BFA;
+  --ok-color:      #22C55E;
+  --err-color:     #EF4444;
+  --err-bg:        rgba(239,68,68,0.1);
+  --toggle-off:    #4A4238;
   --r:             12px;
   --r-sm:          8px;
 }

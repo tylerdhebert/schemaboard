@@ -39,12 +39,17 @@ export function ConnectionModal({ connections, onClose }: ConnectionModalProps) 
   const handleTest = async () => {
     setTestResult('idle')
     setTestError('')
-    const res = await api.api.connections.test.post({ connectionString: connStr })
-    if (res.error || (res.data as { ok: boolean }).ok === false) {
+    try {
+      const res = await api.api.connections.test.post({ connectionString: connStr })
+      if (res.error || (res.data as { ok: boolean }).ok === false) {
+        setTestResult('error')
+        setTestError((res.data as { error?: string })?.error ?? 'Connection failed')
+      } else {
+        setTestResult('ok')
+      }
+    } catch (err) {
       setTestResult('error')
-      setTestError((res.data as { error?: string })?.error ?? 'Connection failed')
-    } else {
-      setTestResult('ok')
+      setTestError(err instanceof Error ? err.message : 'Connection failed')
     }
   }
 
@@ -79,7 +84,7 @@ export function ConnectionModal({ connections, onClose }: ConnectionModalProps) 
             display: 'flex', alignItems: 'center', gap: 10,
             padding: '8px 0', borderBottom: '1px solid var(--border)',
           }}>
-            <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#22C55E', flexShrink: 0 }} />
+            <div style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--ok-color)', flexShrink: 0 }} />
             <span style={{ flex: 1, fontSize: 13, fontWeight: 500, color: 'var(--text-1)' }}>{c.name}</span>
             <button
               onClick={() => deleteMutation.mutate(c.name)}
@@ -107,7 +112,7 @@ export function ConnectionModal({ connections, onClose }: ConnectionModalProps) 
             style={inputStyle}
           />
           {testResult === 'error' && testError && (
-            <div style={{ fontSize: 12, color: '#EF4444', padding: '6px 10px', background: 'rgba(239,68,68,0.1)', borderRadius: 6 }}>
+            <div style={{ fontSize: 12, color: 'var(--err-color)', padding: '6px 10px', background: 'var(--err-bg)', borderRadius: 6 }}>
               {testError}
             </div>
           )}
