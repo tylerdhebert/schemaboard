@@ -12,7 +12,11 @@ interface SidebarProps {
 export function Sidebar({ schemaData, groups, onSelectGroup, onAddGroup }: SidebarProps) {
   const [search, setSearch] = useState('')
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; nodeId: string } | null>(null)
-  const { selectedTables, hiddenGroups, autoExpand, toggleTable, selectTables, toggleGroupVisibility, setZoomToTable } = useStore()
+  const {
+    selectedTables, hiddenGroups, hiddenTables, autoExpand,
+    toggleTable, selectTables, toggleGroupVisibility, toggleTableVisibility,
+    setZoomToTable, resetLayout,
+  } = useStore()
 
   useEffect(() => {
     if (!ctxMenu) return
@@ -118,8 +122,23 @@ export function Sidebar({ schemaData, groups, onSelectGroup, onAddGroup }: Sideb
         />
       </div>
 
+      {/* Recalculate layout button */}
+      <div style={{ padding: '6px 14px', borderBottom: '1px solid var(--border)' }}>
+        <button
+          onClick={resetLayout}
+          style={{
+            width: '100%', padding: '5px 8px',
+            borderRadius: 'var(--r-sm)', border: '1px solid var(--border-strong)',
+            background: 'none', fontFamily: 'inherit', fontSize: 12, fontWeight: 500,
+            color: 'var(--text-3)', cursor: 'pointer',
+          }}
+        >
+          Recalculate layout
+        </button>
+      </div>
+
       {/* Table list */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: 6 }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: 6, position: 'relative' }}>
         {ctxMenu && (
           <div
             style={{
@@ -139,12 +158,23 @@ export function Sidebar({ schemaData, groups, onSelectGroup, onAddGroup }: Sideb
             >
               Zoom to
             </div>
+            <div
+              onClick={() => { toggleTableVisibility(ctxMenu.nodeId); setCtxMenu(null) }}
+              style={{
+                padding: '8px 14px', fontSize: 13, cursor: 'pointer',
+                color: 'var(--text-1)', fontWeight: 500,
+                borderTop: '1px solid var(--border)',
+              }}
+            >
+              {hiddenTables.has(ctxMenu.nodeId) ? 'Show' : 'Hide'}
+            </div>
           </div>
         )}
 
         {filtered.map(table => {
           const nodeId = `${table.schema}.${table.name}`
           const isSelected = selectedTables.has(nodeId)
+          const isHidden = hiddenTables.has(nodeId)
           const group = tableToGroup.get(table.name)
           return (
             <div
@@ -173,6 +203,7 @@ export function Sidebar({ schemaData, groups, onSelectGroup, onAddGroup }: Sideb
                 padding: '6px 9px', borderRadius: 'var(--r-sm)',
                 cursor: 'pointer', marginBottom: 1,
                 background: isSelected ? 'var(--sel-light)' : 'transparent',
+                opacity: isHidden ? 0.35 : 1,
               }}
             >
               <div style={{
@@ -183,6 +214,7 @@ export function Sidebar({ schemaData, groups, onSelectGroup, onAddGroup }: Sideb
               <span style={{
                 fontSize: 12.5, fontWeight: 500, flex: 1,
                 color: isSelected ? 'var(--sel)' : 'var(--text-1)',
+                textDecoration: isHidden ? 'line-through' : 'none',
               }}>
                 {table.name}
               </span>

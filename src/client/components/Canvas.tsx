@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useEffect } from 'react'
+import { useCallback, useMemo, useEffect, useRef } from 'react'
 
 const EDGE_ACTIVE_STROKE = 'rgba(74,123,245,0.5)'
 const EDGE_DIM_STROKE = 'rgba(255,255,255,0.06)'
@@ -36,7 +36,7 @@ interface CanvasProps {
 }
 
 export function Canvas({ schemaData, groups }: CanvasProps) {
-  const { selectedTables, hiddenGroups, autoExpand, toggleTable, selectTables } = useStore()
+  const { selectedTables, hiddenGroups, hiddenTables, autoExpand, layoutKey, toggleTable, selectTables } = useStore()
 
   const tableToGroup = useMemo(() => {
     const map = new Map<string, Group>()
@@ -48,10 +48,12 @@ export function Canvas({ schemaData, groups }: CanvasProps) {
 
   const visibleTables = useMemo(() =>
     schemaData.tables.filter(t => {
+      const nodeId = `${t.schema}.${t.name}`
+      if (hiddenTables.has(nodeId)) return false
       const group = tableToGroup.get(t.name)
       return !group || !hiddenGroups.has(group.id)
     }),
-    [schemaData.tables, tableToGroup, hiddenGroups]
+    [schemaData.tables, tableToGroup, hiddenGroups, hiddenTables]
   )
 
   // Keyed by qualified node ID ("schema.tableName") for consistent matching
@@ -105,14 +107,19 @@ export function Canvas({ schemaData, groups }: CanvasProps) {
   const [rfNodes, setRfNodes, onNodesChange] = useNodesState(enrichedNodes)
   const [rfEdges, setRfEdges, onEdgesChange] = useEdgesState(enrichedEdges)
 
-  // Sync enriched nodes/edges into React Flow state when upstream data changes.
-  // Preserve user-dragged positions — only use layout positions for nodes not yet in RF state.
+  // Track layoutKey to detect when a full reset was requested (skip position preservation)
+  const prevLayoutKey = useRef(layoutKey)
+
   useEffect(() => {
+    const fresh = prevLayoutKey.current !== layoutKey
+    prevLayoutKey.current = layoutKey
     setRfNodes(prev => {
+      if (fresh) return enrichedNodes
       const posMap = new Map(prev.map(n => [n.id, n.position]))
       return enrichedNodes.map(n => ({ ...n, position: posMap.get(n.id) ?? n.position }))
     })
-  }, [enrichedNodes, setRfNodes])
+  }, [enrichedNodes, setRfNodes, layoutKey])
+
   useEffect(() => { setRfEdges(enrichedEdges) }, [enrichedEdges, setRfEdges])
 
   const onNodeClick: NodeMouseHandler = useCallback((_evt, node) => {
@@ -142,7 +149,7 @@ export function Canvas({ schemaData, groups }: CanvasProps) {
         edgeTypes={edgeTypes}
         fitView
         fitViewOptions={{ padding: 0.15 }}
-        minZoom={0.15}
+        minZoom={0.01}
         maxZoom={2}
         proOptions={{ hideAttribution: true }}
       >

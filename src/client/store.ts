@@ -4,28 +4,34 @@ interface AppState {
   activeConnection: string | null
   selectedTables: Set<string>
   hiddenGroups: Set<string>
+  hiddenTables: Set<string>
   autoExpand: boolean
   format: 'condensed' | 'ddl'
   zoomToTable: string | null
+  layoutKey: number
   setActiveConnection: (name: string) => void
   toggleTable: (id: string) => void
   selectTables: (ids: string[]) => void
   clearSelection: () => void
   toggleGroupVisibility: (groupId: string) => void
+  toggleTableVisibility: (id: string) => void
   setAutoExpand: (v: boolean) => void
   setFormat: (f: 'condensed' | 'ddl') => void
   setZoomToTable: (id: string | null) => void
+  resetLayout: () => void
 }
 
 export const useStore = create<AppState>((set) => ({
   activeConnection: null,
   selectedTables: new Set(),
   hiddenGroups: new Set(),
+  hiddenTables: new Set(),
   autoExpand: true,
   format: 'condensed',
   zoomToTable: null,
+  layoutKey: 0,
 
-  setActiveConnection: (name) => set({ activeConnection: name, selectedTables: new Set() }),
+  setActiveConnection: (name) => set({ activeConnection: name, selectedTables: new Set(), hiddenTables: new Set() }),
 
   toggleTable: (id) => set((s) => {
     const next = new Set(s.selectedTables)
@@ -47,7 +53,14 @@ export const useStore = create<AppState>((set) => ({
     return { hiddenGroups: next }
   }),
 
+  toggleTableVisibility: (id) => set((s) => {
+    const next = new Set(s.hiddenTables)
+    next.has(id) ? next.delete(id) : next.add(id)
+    return { hiddenTables: next }
+  }),
+
   setAutoExpand: (autoExpand) => set({ autoExpand }),
   setFormat: (format) => set({ format }),
   setZoomToTable: (zoomToTable) => set({ zoomToTable }),
+  resetLayout: () => set((s) => ({ layoutKey: s.layoutKey + 1 })),
 }))
