@@ -1,0 +1,36 @@
+@import "tailwindcss";
+
+:root {
+  --bg:            #24201A;
+  --surface:       #332E25;
+  --border:        rgba(255,255,255,0.07);
+  --border-strong: rgba(255,255,255,0.12);
+  --text-1:        #EDE6DA;
+  --text-2:        #8C8278;
+  --text-3:        #5E584F;
+  --accent:        #4A7BF5;
+  --accent-light:  rgba(74,123,245,0.15);
+  --accent-grad:   linear-gradient(135deg, #4A7BF5 0%, #22C2C8 100%);
+  --sel:           #F59E0B;
+  --sel-light:     rgba(245,158,11,0.12);
+  --sel-ring:      rgba(245,158,11,0.22);
+  --canvas:        #1A1712;
+  --shadow-md:     0 4px 16px rgba(0,0,0,0.4), 0 2px 6px rgba(0,0,0,0.25);
+  --shadow-lg:     0 12px 40px rgba(0,0,0,0.55), 0 4px 12px rgba(0,0,0,0.35);
+  --r:             12px;
+  --r-sm:          8px;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  background: var(--bg);
+  color: var(--text-1);
+  -webkit-font-smoothing: antialiased;
+}
+
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.18); }
