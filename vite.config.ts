@@ -3,8 +3,17 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import path from 'path'
 
+const SERVER_PORT = process.env.SERVER_PORT ?? '3777'
+
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: { alias: { '@': path.resolve(__dirname, 'src') } },
-  server: { proxy: { '/api': 'http://localhost:3777' } }
+  server: {
+    proxy: {
+      '/api': {
+        target: `http://localhost:${SERVER_PORT}`,
+        changeOrigin: true
+      }
+    }
+  }
 })

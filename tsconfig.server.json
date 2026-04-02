@@ -1,0 +1,8 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["bun-types"],
+    "noEmit": false
+  },
+  "include": ["src/server", "src/types.ts"]
+}

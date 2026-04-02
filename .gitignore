@@ -1,3 +1,9 @@
 node_modules/
 dist/
 schemaboard.config.json
+.env
+.env.local
+*.env
+.DS_Store
+Thumbs.db
+*.tsbuildinfo

@@ -2,7 +2,7 @@
   "connections": [
     {
       "name": "Local Dev",
-      "connectionString": "Server=localhost;Database=MyDb;User Id=sa;Password=yourpassword;TrustServerCertificate=true"
+      "connectionString": "Server=localhost;Database=MyDb;User Id=appuser;Password=yourpassword;TrustServerCertificate=true"
     }
   ],
   "groups": [
