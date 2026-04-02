@@ -2,6 +2,59 @@ import sql from 'mssql'
 import { buildSchemaData } from './shared'
 import type { DbAdapter } from './types'
 
+// Normalize a connection string key (lowercase, strip spaces/underscores)
+function normKey(k: string) {
+  return k.toLowerCase().replace(/[\s_]/g, '')
+}
+
+// Parse an ADO.NET-style connection string into a key→value map
+function parseConnStr(connStr: string): Record<string, string> {
+  const map: Record<string, string> = {}
+  for (const segment of connStr.split(';')) {
+    const eq = segment.indexOf('=')
+    if (eq === -1) continue
+    const k = normKey(segment.slice(0, eq).trim())
+    const v = segment.slice(eq + 1).trim()
+    if (k) map[k] = v
+  }
+  return map
+}
+
+// Returns true if connection string requests Windows/integrated authentication
+function isWindowsAuth(parts: Record<string, string>): boolean {
+  const intSec = parts['integratedsecurity'] ?? parts['trustedconnection'] ?? ''
+  const val = intSec.toLowerCase()
+  return val === 'true' || val === 'yes' || val === 'sspi'
+}
+
+// Build an mssql config for Windows auth from a parsed connection string.
+// Uses authentication.type='default' which tells tedious to use SSPI on Windows.
+function buildWindowsAuthConfig(parts: Record<string, string>): sql.config {
+  const server =
+    parts['datasource'] ?? parts['server'] ?? parts['address'] ?? parts['addr'] ?? parts['networkaddress'] ?? ''
+  const database = parts['initialcatalog'] ?? parts['database'] ?? ''
+  const trustCert =
+    (parts['trustservercertificate'] ?? '').toLowerCase() === 'true' ||
+    (parts['trustservercertificate'] ?? '').toLowerCase() === 'yes'
+
+  return {
+    server,
+    database,
+    authentication: { type: 'default', options: {} },
+    options: {
+      trustServerCertificate: trustCert,
+      enableArithAbort: true,
+    },
+  }
+}
+
+// Returns a connection string or config object ready for sql.connect()
+function resolveConfig(connectionString: string): string | sql.config {
+  const parts = parseConnStr(connectionString)
+  if (isWindowsAuth(parts)) return buildWindowsAuthConfig(parts)
+  return connectionString
+}
+
 const COLUMNS_QUERY = `
 SELECT
   t.TABLE_SCHEMA  AS [schema],
@@ -53,7 +106,7 @@ JOIN sys.columns cr
 export const sqlServerAdapter: DbAdapter = {
   async testConnection(connectionString) {
     try {
-      const pool = await sql.connect(connectionString)
+      const pool = await sql.connect(resolveConfig(connectionString))
       await pool.close()
     } catch (err) {
       throw new Error(`Connection failed: ${err instanceof Error ? err.message : String(err)}`)
@@ -63,7 +116,7 @@ export const sqlServerAdapter: DbAdapter = {
   async fetchSchema(connectionString) {
     let pool: sql.ConnectionPool | undefined
     try {
-      pool = await sql.connect(connectionString)
+      pool = await sql.connect(resolveConfig(connectionString))
       const [colResult, pkResult, fkResult] = await Promise.all([
         pool.request().query(COLUMNS_QUERY),
         pool.request().query(PKS_QUERY),
