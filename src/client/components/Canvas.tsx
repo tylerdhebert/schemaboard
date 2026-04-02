@@ -110,7 +110,7 @@ export function Canvas({ schemaData, groups }: CanvasProps) {
   }, [toggleTable, autoExpand, fkNeighbors, selectTables])
 
   return (
-    <div style={{ flex: 1, background: 'var(--canvas)' }}>
+    <div style={{ width: '100%', height: '100%', background: 'var(--canvas)' }}>
       <ReactFlow
         nodes={rfNodes}
         edges={rfEdges}

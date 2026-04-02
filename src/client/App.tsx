@@ -90,12 +90,14 @@ export function App() {
       <Header connections={connections} onRefresh={() => refetch()} />
 
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-        <Sidebar
-          schemaData={schemaData}
-          groups={groups as Group[]}
-          onSelectGroup={handleSelectGroup}
-          onAddGroup={() => setShowGroupModal(true)}
-        />
+        {activeConnection && (
+          <Sidebar
+            schemaData={schemaData}
+            groups={groups as Group[]}
+            onSelectGroup={handleSelectGroup}
+            onAddGroup={() => setShowGroupModal(true)}
+          />
+        )}
 
         <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
           {activeConnection ? (
@@ -180,7 +182,7 @@ export function App() {
           )}
         </div>
 
-        <ContextPanel schemaData={schemaData} />
+        {activeConnection && <ContextPanel schemaData={schemaData} />}
       </div>
 
       {showGroupModal && (
