@@ -12,7 +12,7 @@ import type { Group, SchemaData } from '../types'
 const EMPTY_SCHEMA: SchemaData = { tables: [], foreignKeys: [] }
 
 export function App() {
-  const { activeConnection, selectedTables, clearSelection, selectTables } = useStore()
+  const { activeConnection, selectedTables, clearSelection, selectTables, toggleTableVisibility } = useStore()
   const [showGroupModal, setShowGroupModal] = useState(false)
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; tableId: string } | null>(null)
   const qc = useQueryClient()
@@ -127,6 +127,20 @@ export function App() {
             }}>
               <span style={{ fontWeight: 800, color: 'var(--sel)' }}>{selectedTables.size}</span>
               <span>table{selectedTables.size > 1 ? 's' : ''} selected</span>
+              <button
+                onClick={e => {
+                  e.stopPropagation()
+                  selectedTables.forEach(id => toggleTableVisibility(id))
+                  clearSelection()
+                }}
+                style={{
+                  fontSize: 11.5, color: 'var(--text-3)', cursor: 'pointer',
+                  padding: '2px 7px', borderRadius: 4,
+                  border: '1px solid var(--border-strong)', background: 'none', fontFamily: 'inherit',
+                }}
+              >
+                Hide
+              </button>
               <button
                 onClick={e => { e.stopPropagation(); clearSelection() }}
                 style={{

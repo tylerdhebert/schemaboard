@@ -122,12 +122,12 @@ export function Sidebar({ schemaData, groups, onSelectGroup, onAddGroup }: Sideb
         />
       </div>
 
-      {/* Recalculate layout button */}
-      <div style={{ padding: '6px 14px', borderBottom: '1px solid var(--border)' }}>
+      {/* Recalculate layout + show all hidden */}
+      <div style={{ padding: '6px 14px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 6 }}>
         <button
           onClick={resetLayout}
           style={{
-            width: '100%', padding: '5px 8px',
+            flex: 1, padding: '5px 8px',
             borderRadius: 'var(--r-sm)', border: '1px solid var(--border-strong)',
             background: 'none', fontFamily: 'inherit', fontSize: 12, fontWeight: 500,
             color: 'var(--text-3)', cursor: 'pointer',
@@ -135,6 +135,19 @@ export function Sidebar({ schemaData, groups, onSelectGroup, onAddGroup }: Sideb
         >
           Recalculate layout
         </button>
+        {hiddenTables.size > 0 && (
+          <button
+            onClick={() => [...hiddenTables].forEach(id => toggleTableVisibility(id))}
+            style={{
+              padding: '5px 8px',
+              borderRadius: 'var(--r-sm)', border: '1px solid var(--border-strong)',
+              background: 'none', fontFamily: 'inherit', fontSize: 12, fontWeight: 500,
+              color: 'var(--accent)', cursor: 'pointer', whiteSpace: 'nowrap',
+            }}
+          >
+            Show all ({hiddenTables.size})
+          </button>
+        )}
       </div>
 
       {/* Table list */}
