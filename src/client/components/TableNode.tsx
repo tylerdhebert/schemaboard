@@ -4,7 +4,7 @@ import type { SchemaTable, Group } from '../../types'
 
 interface TableNodeData {
   table: SchemaTable
-  group: Group | null
+  groups: Group[]
   selected: boolean
   dim: boolean
   matched?: boolean
@@ -17,8 +17,8 @@ interface TableNodeProps {
 }
 
 export const TableNode = memo(function TableNode({ id, data }: TableNodeProps) {
-  const { table, group, selected, dim, matched, compact } = data
-  const groupColor = group?.color ?? 'var(--text-3)'
+  const { table, groups, selected, dim, matched, compact } = data
+  const groupColors = groups.length > 0 ? groups.map(group => group.color) : ['var(--text-3)']
 
   return (
     <div
@@ -52,10 +52,17 @@ export const TableNode = memo(function TableNode({ id, data }: TableNodeProps) {
         display: 'flex', alignItems: 'center', gap: 7,
         borderBottom: '1px solid var(--border)',
       }}>
-        <div style={{
-          width: 3, height: 17, borderRadius: 2,
-          background: groupColor, flexShrink: 0,
-        }} />
+        <div style={{ display: 'flex', alignItems: 'stretch', gap: 3, flexShrink: 0 }}>
+          {groupColors.map(color => (
+            <div
+              key={color}
+              style={{
+                width: 3, height: 17, borderRadius: 2,
+                background: color,
+              }}
+            />
+          ))}
+        </div>
         <span style={{
           fontSize: 12.5, fontWeight: 700, letterSpacing: -0.2,
           flex: 1, color: 'var(--text-1)',

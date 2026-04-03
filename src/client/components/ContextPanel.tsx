@@ -9,7 +9,7 @@ interface ContextPanelProps {
 }
 
 export function ContextPanel({ schemaData }: ContextPanelProps) {
-  const { selectedTables, format, autoExpand, setFormat, setAutoExpand } = useStore()
+  const { selectedTables, format, setFormat } = useStore()
   const [copied, setCopied] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [editedText, setEditedText] = useState('')
@@ -104,33 +104,6 @@ export function ContextPanel({ schemaData }: ContextPanelProps) {
             {f === 'condensed' ? 'Condensed' : 'DDL'}
           </button>
         ))}
-      </div>
-
-      {/* Auto-expand toggle */}
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '9px 18px', borderBottom: '1px solid var(--border)',
-      }}>
-        <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-2)' }}>
-          Auto-expand FK neighbors
-        </span>
-        <div
-          onClick={() => setAutoExpand(!autoExpand)}
-          style={{
-            width: 30, height: 17, borderRadius: 9,
-            background: autoExpand ? 'var(--accent)' : 'var(--toggle-off)',
-            position: 'relative', cursor: 'pointer', transition: 'background 0.18s',
-            flexShrink: 0,
-          }}
-        >
-          <div style={{
-            position: 'absolute', width: 13, height: 13, borderRadius: '50%',
-            background: 'white', top: 2, left: 2,
-            transition: 'transform 0.18s',
-            transform: autoExpand ? 'translateX(13px)' : 'none',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
-          }} />
-        </div>
       </div>
 
       {/* Preview header with edit toggle */}

@@ -1,10 +1,8 @@
 import dagre from '@dagrejs/dagre'
-import {
-  forceSimulation, forceLink, forceManyBody, forceCenter, forceCollide,
-  type SimulationNodeDatum, type SimulationLinkDatum,
-} from 'd3-force'
-import ELK from 'elkjs/lib/elk.bundled.js'
 import type { Node, Edge } from '@xyflow/react'
+import type {
+  SimulationNodeDatum, SimulationLinkDatum,
+} from 'd3-force'
 import type { SchemaTable, ForeignKey, LayoutType } from '../../types'
 
 const NODE_WIDTH = 220
@@ -96,7 +94,10 @@ interface ForceLink extends SimulationLinkDatum<ForceNode> {
   target: string | ForceNode
 }
 
-function buildForceLayout(tables: SchemaTable[], foreignKeys: ForeignKey[]) {
+async function buildForceLayout(tables: SchemaTable[], foreignKeys: ForeignKey[]) {
+  const {
+    forceSimulation, forceLink, forceManyBody, forceCenter, forceCollide,
+  } = await import('d3-force')
   const tableByName = new Map(tables.map(t => [t.name, t]))
   const nodeIds = new Set(tables.map(t => `${t.schema}.${t.name}`))
 
@@ -146,6 +147,7 @@ function buildForceLayout(tables: SchemaTable[], foreignKeys: ForeignKey[]) {
 // ── ELK ────────────────────────────────────────────────────────────────────
 
 async function buildElkLayout(tables: SchemaTable[], foreignKeys: ForeignKey[]) {
+  const { default: ELK } = await import('elkjs/lib/elk.bundled.js')
   const elk = new ELK()
   const tableByName = new Map(tables.map(t => [t.name, t]))
   const nodeIds = new Set(tables.map(t => `${t.schema}.${t.name}`))

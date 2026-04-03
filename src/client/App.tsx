@@ -1,21 +1,39 @@
-import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from './api/client'
-import { useStore } from './store'
-import { traceFkChain } from './lib/fk-chain'
-import { Header } from './components/Header'
-import { Sidebar } from './components/Sidebar'
 import { Canvas } from './components/Canvas'
 import { ContextPanel } from './components/ContextPanel'
 import { GroupModal } from './components/GroupModal'
-import type { Connection, Group, SchemaData } from '../types'
+import { Header } from './components/Header'
+import { SchemaDiffModal } from './components/SchemaDiffModal'
+import { Sidebar } from './components/Sidebar'
+import { WorkspaceModal } from './components/WorkspaceModal'
+import { useStore } from './store'
+import type { Connection, Group, SchemaData, Workspace } from '../types'
 
 const EMPTY_SCHEMA: SchemaData = { tables: [], foreignKeys: [] }
 
+function tableNameFromId(tableId: string): string {
+  return tableId.split('.').slice(1).join('.')
+}
+
 export function App() {
-  const { activeConnection, selectedTables, clearSelection, selectTables, deselectTables, toggleTableVisibility, setHiddenTables } = useStore()
-  const [showGroupModal, setShowGroupModal] = useState(false)
+  const {
+    activeConnection,
+    activeWorkspaceId,
+    applyWorkspaceState,
+    selectedTables,
+    clearSelection,
+    selectTables,
+    deselectTables,
+    toggleTableVisibility,
+    setActiveWorkspaceId,
+    setHiddenTables,
+  } = useStore()
+  const [groupModalState, setGroupModalState] = useState<{ initialTableName?: string | null; editGroupId?: string | null } | null>(null)
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; tableId: string } | null>(null)
+  const [showWorkspaceModal, setShowWorkspaceModal] = useState(false)
+  const [showDiffModal, setShowDiffModal] = useState(false)
   const qc = useQueryClient()
 
   const { data: connections = [] } = useQuery({
@@ -23,8 +41,8 @@ export function App() {
     queryFn: async () => {
       const res = await api.api.connections.get()
       if (res.error) throw res.error
-      return res.data ?? []
-    }
+      return (res.data as Connection[]) ?? []
+    },
   })
 
   const { data: groups = [] } = useQuery({
@@ -32,8 +50,18 @@ export function App() {
     queryFn: async () => {
       const res = await api.api.groups.get()
       if (res.error) throw res.error
-      return res.data ?? []
-    }
+      return (res.data as Group[]) ?? []
+    },
+  })
+
+  const { data: workspaces = [] } = useQuery({
+    queryKey: ['workspaces', activeConnection],
+    enabled: !!activeConnection,
+    queryFn: async () => {
+      const res = await api.api.workspaces.get({ query: { connection: activeConnection! } })
+      if (res.error) throw res.error
+      return (res.data as Workspace[]) ?? []
+    },
   })
 
   const { data: schemaData = EMPTY_SCHEMA, refetch } = useQuery({
@@ -45,77 +73,109 @@ export function App() {
         if (res.error) throw res.error
         return (res.data as SchemaData) ?? EMPTY_SCHEMA
       }
+
       const res = await api.api.schema.get({ query: { connection: activeConnection! } })
       if (res.error) throw res.error
       return (res.data as SchemaData) ?? EMPTY_SCHEMA
-    }
+    },
   })
 
-  const fkNeighbors = useMemo(() => {
-    const tableByName = new Map(schemaData.tables.map(t => [t.name, t]))
-    const map = new Map<string, string[]>()
-    for (const fk of schemaData.foreignKeys) {
-      const p = tableByName.get(fk.parentTable)
-      const r = tableByName.get(fk.referencedTable)
-      if (!p || !r) continue
-      const pId = `${p.schema}.${p.name}`
-      const rId = `${r.schema}.${r.name}`
-      if (!map.has(pId)) map.set(pId, [])
-      if (!map.has(rId)) map.set(rId, [])
-      map.get(pId)!.push(rId)
-      map.get(rId)!.push(pId)
+  useEffect(() => {
+    if (activeWorkspaceId && !(workspaces as Workspace[]).some(workspace => workspace.id === activeWorkspaceId)) {
+      setActiveWorkspaceId(null)
     }
-    return map
-  }, [schemaData.tables, schemaData.foreignKeys])
+  }, [activeWorkspaceId, workspaces, setActiveWorkspaceId])
 
-  // Apply hideAllInitially when schema first loads for each connection switch.
-  // Use a ref so refreshes don't re-hide tables the user has already shown.
   const lastHideConnectionRef = useRef<string | null>(null)
   useEffect(() => {
     if (!activeConnection || !schemaData.tables.length) return
     if (lastHideConnectionRef.current === activeConnection) return
+
     lastHideConnectionRef.current = activeConnection
-    const conn = (connections as Connection[]).find(c => c.name === activeConnection)
-    if (conn?.hideAllInitially) {
-      setHiddenTables(schemaData.tables.map(t => `${t.schema}.${t.name}`))
+    const connection = (connections as Connection[]).find(item => item.name === activeConnection)
+    if (connection?.hideAllInitially) {
+      setHiddenTables(schemaData.tables.map(table => `${table.schema}.${table.name}`))
     }
   }, [activeConnection, schemaData, connections, setHiddenTables])
 
   const assignGroupMutation = useMutation({
     mutationFn: async ({ groupId, tableName }: { groupId: string; tableName: string }) => {
-      const group = (groups as Group[]).find(g => g.id === groupId)
-      if (!group) return
-      const tables = group.tables.includes(tableName)
-        ? group.tables
-        : [...group.tables, tableName]
-      const res = await api.api.groups({ id: groupId }).put({ tables })
+      const res = await api.api.groups.membership.post({ tableName, action: 'add', groupId })
       if (res.error) throw res.error
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['groups'] })
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['groups'] }),
   })
 
+  const unassignGroupMutation = useMutation({
+    mutationFn: async ({ tableName, groupId }: { tableName: string; groupId?: string }) => {
+      const res = await api.api.groups.membership.post(
+        groupId
+          ? { tableName, action: 'remove', groupId }
+          : { tableName, action: 'clear' }
+      )
+      if (res.error) throw res.error
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['groups'] }),
+  })
+
+  const tableByName = useMemo(
+    () => new Map(schemaData.tables.map(table => [table.name, table])),
+    [schemaData.tables]
+  )
+
+  const currentWorkspace = useMemo(
+    () => (workspaces as Workspace[]).find(workspace => workspace.id === activeWorkspaceId) ?? null,
+    [workspaces, activeWorkspaceId]
+  )
+
   const handleSelectGroup = useCallback((groupId: string) => {
-    const group = (groups as Group[]).find(g => g.id === groupId)
+    const group = (groups as Group[]).find(item => item.id === groupId)
     if (!group) return
+
     const ids = group.tables
-      .map(name => schemaData.tables.find(t => t.name === name))
-      .filter((t): t is NonNullable<typeof t> => t != null)
-      .map(t => `${t.schema}.${t.name}`)
+      .map(name => tableByName.get(name))
+      .filter((table): table is NonNullable<typeof table> => table != null)
+      .map(table => `${table.schema}.${table.name}`)
+
     const allSelected = ids.length > 0 && ids.every(id => selectedTables.has(id))
     if (allSelected) {
       deselectTables(ids)
     } else {
       selectTables(ids)
     }
-  }, [groups, schemaData.tables, selectedTables, selectTables, deselectTables])
+  }, [groups, tableByName, selectedTables, selectTables, deselectTables])
 
-  const handleContextMenu = useCallback((e: React.MouseEvent) => {
-    const target = (e.target as HTMLElement).closest('[data-table-id]') as HTMLElement | null
-    if (target?.dataset.tableId) {
-      e.preventDefault()
-      setCtxMenu({ x: e.clientX, y: e.clientY, tableId: target.dataset.tableId })
-    }
+  const handleContextMenu = useCallback((event: React.MouseEvent) => {
+    const target = (event.target as HTMLElement).closest('[data-table-id]') as HTMLElement | null
+    if (!target?.dataset.tableId) return
+
+    event.preventDefault()
+    setCtxMenu({ x: event.clientX, y: event.clientY, tableId: target.dataset.tableId })
   }, [])
+
+  const openGroupModal = useCallback((initialTableName?: string | null, editGroupId?: string | null) => {
+    setCtxMenu(null)
+    setGroupModalState({ initialTableName: initialTableName ?? null, editGroupId: editGroupId ?? null })
+  }, [])
+
+  const handleAssignTableToGroup = useCallback((tableId: string, groupId: string) => {
+    assignGroupMutation.mutate({ groupId, tableName: tableNameFromId(tableId) })
+    setCtxMenu(null)
+  }, [assignGroupMutation])
+
+  const handleUnassignTable = useCallback((tableId: string, groupId?: string) => {
+    unassignGroupMutation.mutate({ tableName: tableNameFromId(tableId), groupId })
+    setCtxMenu(null)
+  }, [unassignGroupMutation])
+
+  const handleLoadWorkspace = useCallback((workspace: Workspace) => {
+    applyWorkspaceState(workspace.state, workspace.id)
+  }, [applyWorkspaceState])
+
+  const ctxMenuTableName = ctxMenu ? tableNameFromId(ctxMenu.tableId) : null
+  const ctxMenuGroups = ctxMenuTableName
+    ? (groups as Group[]).filter(group => group.tables.includes(ctxMenuTableName))
+    : []
 
   return (
     <div
@@ -123,7 +183,13 @@ export function App() {
       onClick={() => setCtxMenu(null)}
       onContextMenu={handleContextMenu}
     >
-      <Header connections={connections} onRefresh={() => refetch()} />
+      <Header
+        connections={connections as Connection[]}
+        currentWorkspaceName={currentWorkspace?.name ?? null}
+        onRefresh={() => refetch()}
+        onOpenWorkspaces={() => setShowWorkspaceModal(true)}
+        onOpenDiff={() => setShowDiffModal(true)}
+      />
 
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
         {activeConnection && (
@@ -131,7 +197,9 @@ export function App() {
             schemaData={schemaData}
             groups={groups as Group[]}
             onSelectGroup={handleSelectGroup}
-            onAddGroup={() => setShowGroupModal(true)}
+            onOpenGroupModal={openGroupModal}
+            onAssignTableToGroup={handleAssignTableToGroup}
+            onUnassignTable={handleUnassignTable}
           />
         )}
 
@@ -140,9 +208,13 @@ export function App() {
             <Canvas schemaData={schemaData} groups={groups as Group[]} />
           ) : (
             <div style={{
-              flex: 1, height: '100%',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: 'var(--text-3)', fontSize: 14,
+              flex: 1,
+              height: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'var(--text-3)',
+              fontSize: 14,
               background: 'var(--canvas)',
               backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.07) 1px, transparent 1px)',
               backgroundSize: '22px 22px',
@@ -151,90 +223,139 @@ export function App() {
             </div>
           )}
 
-          {/* Selection count bar */}
           {selectedTables.size > 0 && (
             <div style={{
-              position: 'absolute', top: 16, left: '50%', transform: 'translateX(-50%)',
-              background: 'var(--surface)', border: '1px solid var(--border)',
-              borderRadius: 40, padding: '5px 14px',
-              display: 'flex', alignItems: 'center', gap: 10,
-              boxShadow: 'var(--shadow-md)', fontSize: 13, fontWeight: 500,
-              color: 'var(--text-2)', zIndex: 10, pointerEvents: 'auto',
+              position: 'absolute',
+              top: 16,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              background: 'var(--surface)',
+              border: '1px solid var(--border)',
+              borderRadius: 40,
+              padding: '5px 14px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              boxShadow: 'var(--shadow-md)',
+              fontSize: 13,
+              fontWeight: 500,
+              color: 'var(--text-2)',
+              zIndex: 10,
+              pointerEvents: 'auto',
             }}>
               <span style={{ fontWeight: 800, color: 'var(--sel)' }}>{selectedTables.size}</span>
               <span>table{selectedTables.size > 1 ? 's' : ''} selected</span>
               <button
-                onClick={e => {
-                  e.stopPropagation()
+                onClick={event => {
+                  event.stopPropagation()
                   selectedTables.forEach(id => toggleTableVisibility(id))
                   clearSelection()
                 }}
                 style={{
-                  fontSize: 11.5, color: 'var(--text-3)', cursor: 'pointer',
-                  padding: '2px 7px', borderRadius: 4,
-                  border: '1px solid var(--border-strong)', background: 'none', fontFamily: 'inherit',
+                  fontSize: 11.5,
+                  color: 'var(--text-3)',
+                  cursor: 'pointer',
+                  padding: '2px 7px',
+                  borderRadius: 4,
+                  border: '1px solid var(--border-strong)',
+                  background: 'none',
+                  fontFamily: 'inherit',
                 }}
               >
                 Hide
               </button>
               <button
-                onClick={e => { e.stopPropagation(); clearSelection() }}
+                onClick={event => {
+                  event.stopPropagation()
+                  clearSelection()
+                }}
                 style={{
-                  fontSize: 11.5, color: 'var(--text-3)', cursor: 'pointer',
-                  padding: '2px 7px', borderRadius: 4,
-                  border: 'none', background: 'none', fontFamily: 'inherit',
+                  fontSize: 11.5,
+                  color: 'var(--text-3)',
+                  cursor: 'pointer',
+                  padding: '2px 7px',
+                  borderRadius: 4,
+                  border: 'none',
+                  background: 'none',
+                  fontFamily: 'inherit',
                 }}
               >
-                Clear ×
+                Clear x
               </button>
             </div>
           )}
 
-          {/* Right-click context menu */}
           {ctxMenu && (
             <div
               style={{
-                position: 'fixed', left: ctxMenu.x, top: ctxMenu.y,
-                background: 'var(--surface)', border: '1px solid var(--border)',
-                borderRadius: 'var(--r-sm)', boxShadow: 'var(--shadow-lg)',
-                zIndex: 50, minWidth: 160, overflow: 'hidden',
+                position: 'fixed',
+                left: ctxMenu.x,
+                top: ctxMenu.y,
+                background: 'var(--surface)',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--r-sm)',
+                boxShadow: 'var(--shadow-lg)',
+                zIndex: 50,
+                minWidth: 180,
+                overflow: 'hidden',
               }}
-              onClick={e => e.stopPropagation()}
+              onClick={event => event.stopPropagation()}
             >
+              {ctxMenuGroups.map(group => (
+                <div
+                  key={group.id}
+                  onClick={() => handleUnassignTable(ctxMenu.tableId, group.id)}
+                  style={{ padding: '8px 12px', fontSize: 13, cursor: 'pointer', color: 'var(--text-1)', fontWeight: 500 }}
+                >
+                  Unassign from {group.name}
+                </div>
+              ))}
               <div
-                onClick={() => {
-                  selectTables(traceFkChain(ctxMenu.tableId, fkNeighbors))
-                  setCtxMenu(null)
+                onClick={() => openGroupModal(ctxMenuTableName)}
+                style={{
+                  padding: '8px 12px',
+                  fontSize: 13,
+                  cursor: 'pointer',
+                  color: 'var(--text-1)',
+                  fontWeight: 500,
+                  borderTop: ctxMenuGroups.length > 0 ? '1px solid var(--border)' : 'none',
                 }}
-                style={{ padding: '8px 12px', fontSize: 13, cursor: 'pointer', color: 'var(--text-1)', fontWeight: 500 }}
               >
-                Trace FK chain
+                Add to new group
               </div>
-              <div style={{ padding: '4px 12px 3px', fontSize: 10, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.8px', borderBottom: '1px solid var(--border)', borderTop: '1px solid var(--border)' }}>
+              <div style={{
+                padding: '4px 12px 3px',
+                fontSize: 10,
+                fontWeight: 700,
+                color: 'var(--text-3)',
+                textTransform: 'uppercase',
+                letterSpacing: '0.8px',
+                borderBottom: '1px solid var(--border)',
+                borderTop: '1px solid var(--border)',
+              }}>
                 Assign to group
               </div>
-              {(groups as Group[]).length === 0 && (
+              {(groups as Group[]).filter(group => !ctxMenuGroups.some(item => item.id === group.id)).length === 0 && (
                 <div style={{ padding: '8px 12px', fontSize: 12, color: 'var(--text-3)' }}>
-                  No groups yet
+                  No other groups
                 </div>
               )}
-              {(groups as Group[]).map(g => (
+              {(groups as Group[]).filter(group => !ctxMenuGroups.some(item => item.id === group.id)).map(group => (
                 <div
-                  key={g.id}
-                  onClick={() => {
-                    // tableId is "schema.tableName" — extract unqualified name
-                    const tableName = ctxMenu.tableId.split('.').slice(1).join('.')
-                    assignGroupMutation.mutate({ groupId: g.id, tableName })
-                    setCtxMenu(null)
-                  }}
+                  key={group.id}
+                  onClick={() => handleAssignTableToGroup(ctxMenu.tableId, group.id)}
                   style={{
-                    display: 'flex', alignItems: 'center', gap: 8,
-                    padding: '8px 12px', cursor: 'pointer', fontSize: 13,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    padding: '8px 12px',
+                    cursor: 'pointer',
+                    fontSize: 13,
                     color: 'var(--text-1)',
                   }}
                 >
-                  <div style={{ width: 9, height: 9, borderRadius: 3, background: g.color, flexShrink: 0 }} />
-                  {g.name}
+                  <div style={{ width: 9, height: 9, borderRadius: 3, background: group.color, flexShrink: 0 }} />
+                  {group.name}
                 </div>
               ))}
             </div>
@@ -244,10 +365,31 @@ export function App() {
         {activeConnection && <ContextPanel schemaData={schemaData} />}
       </div>
 
-      {showGroupModal && (
+      {groupModalState && (
         <GroupModal
           groups={groups as Group[]}
-          onClose={() => setShowGroupModal(false)}
+          initialTableName={groupModalState.initialTableName}
+          editGroupId={groupModalState.editGroupId}
+          onClose={() => setGroupModalState(null)}
+        />
+      )}
+
+      {showWorkspaceModal && activeConnection && (
+        <WorkspaceModal
+          activeConnection={activeConnection}
+          workspaces={workspaces as Workspace[]}
+          activeWorkspaceId={activeWorkspaceId}
+          onLoadWorkspace={handleLoadWorkspace}
+          onClose={() => setShowWorkspaceModal(false)}
+        />
+      )}
+
+      {showDiffModal && activeConnection && (
+        <SchemaDiffModal
+          activeConnection={activeConnection}
+          currentSchema={schemaData}
+          connections={connections as Connection[]}
+          onClose={() => setShowDiffModal(false)}
         />
       )}
     </div>

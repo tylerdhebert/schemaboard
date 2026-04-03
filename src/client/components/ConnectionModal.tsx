@@ -37,7 +37,10 @@ export function ConnectionModal({ connections, onClose }: ConnectionModalProps) 
   const [tablePickerOpen, setTablePickerOpen] = useState(false)
   const [loadingTables, setLoadingTables] = useState(false)
   const [hideAllInitially, setHideAllInitially] = useState(false)
+  const [testedSignature, setTestedSignature] = useState<string | null>(null)
   const qc = useQueryClient()
+
+  const currentTestSignature = `${dbType}::${connStr}`
 
   const resetForm = () => {
     setEditingName(null)
@@ -52,6 +55,7 @@ export function ConnectionModal({ connections, onClose }: ConnectionModalProps) 
     setIncludedTables([])
     setAvailableTables(null)
     setHideAllInitially(false)
+    setTestedSignature(null)
   }
 
   const startEdit = (conn: Connection) => {
@@ -67,20 +71,33 @@ export function ConnectionModal({ connections, onClose }: ConnectionModalProps) 
     setChipInput('')
     setAvailableTables(null)
     setHideAllInitially(conn.hideAllInitially ?? false)
+    setTestedSignature(null)
+  }
+
+  const runConnectionTest = async () => {
+    const res = await api.api.connections.test.post({ connectionString: connStr, type: dbType })
+    const data = res.data as { ok: boolean; schemas?: string[]; error?: string } | null
+
+    if (res.error || !data?.ok) {
+      const msg = data?.error ?? 'Connection failed'
+      setTestResult('error')
+      setTestError(msg)
+      setTestedSignature(null)
+      throw new Error(msg)
+    }
+
+    setTestResult('ok')
+    setTestError('')
+    setAvailableSchemas(data.schemas ?? [])
+    setTestedSignature(currentTestSignature)
+    return data
   }
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      const testRes = await api.api.connections.test.post({ connectionString: connStr, type: dbType })
-      const testData = testRes.data as { ok: boolean; schemas?: string[]; error?: string } | null
-      if (testRes.error || !testData?.ok) {
-        const msg = testData?.error ?? 'Connection failed'
-        setTestResult('error')
-        setTestError(msg)
-        throw new Error(msg)
+      if (testedSignature !== currentTestSignature) {
+        await runConnectionTest()
       }
-      setTestResult('ok')
-      setAvailableSchemas(testData.schemas ?? [])
 
       const payload = {
         name,
@@ -120,15 +137,7 @@ export function ConnectionModal({ connections, onClose }: ConnectionModalProps) 
     setTestError('')
     setAvailableSchemas([])
     try {
-      const res = await api.api.connections.test.post({ connectionString: connStr, type: dbType })
-      const data = res.data as { ok: boolean; schemas?: string[]; error?: string } | null
-      if (res.error || !data?.ok) {
-        setTestResult('error')
-        setTestError(data?.error ?? 'Connection failed')
-      } else {
-        setTestResult('ok')
-        setAvailableSchemas(data.schemas ?? [])
-      }
+      await runConnectionTest()
     } catch (err) {
       setTestResult('error')
       setTestError(err instanceof Error ? err.message : 'Connection failed')

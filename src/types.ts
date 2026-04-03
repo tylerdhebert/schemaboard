@@ -2,6 +2,7 @@
 
 export type DbType = 'sqlserver' | 'postgres' | 'sqlite'
 export type LayoutType = 'dagre' | 'force' | 'elk'
+export type ContextFormat = 'condensed' | 'ddl'
 
 export interface Column {
   name: string
@@ -48,6 +49,41 @@ export interface Group {
   name: string
   color: string
   tables: string[]   // table names (unqualified)
+}
+
+export interface TablePosition {
+  x: number
+  y: number
+}
+
+export interface WorkspaceState {
+  selectedTables: string[]
+  hiddenGroups: string[]
+  hiddenTables: string[]
+  format: ContextFormat
+  layoutType: LayoutType
+  compactNodes: boolean
+  tablePositions: Record<string, TablePosition>
+}
+
+export interface Workspace {
+  id: string
+  connectionName: string
+  name: string
+  state: WorkspaceState
+  createdAt: string
+  updatedAt: string
+}
+
+export interface SchemaSnapshotSummary {
+  id: string
+  connectionName: string
+  name: string
+  createdAt: string
+}
+
+export interface SchemaSnapshot extends SchemaSnapshotSummary {
+  schema: SchemaData
 }
 
 export interface AppConfig {

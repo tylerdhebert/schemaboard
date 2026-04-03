@@ -5,7 +5,7 @@
   "scripts": {
     "dev:server": "bun --watch src/server/index.ts",
     "dev:client": "vite",
-    "dev": "concurrently \"bun run dev:server\" \"bun run dev:client\"",
+    "dev": "concurrently --kill-others --kill-others-on-fail \"bun run dev:server\" \"bun run dev:client\"",
     "build": "vite build",
     "test": "bun test"
   },
@@ -18,6 +18,7 @@
     "d3-force": "^3.0.0",
     "elkjs": "^0.11.1",
     "elysia": "^1.2.0",
+    "lucide-react": "^1.7.0",
     "msnodesqlv8": "^5.1.8",
     "mssql": "^11.0.1",
     "pg": "^8.20.0",

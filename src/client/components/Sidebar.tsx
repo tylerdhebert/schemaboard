@@ -1,17 +1,45 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
+import {
+  Binary,
+  Boxes,
+  ChevronDown,
+  ChevronRight,
+  Eye,
+  FolderPlus,
+  Gauge,
+  Maximize2,
+  Network,
+  RefreshCw,
+  Rows3,
+} from 'lucide-react'
 import { useStore } from '../store'
 import { TablePicker } from './TablePicker'
-import { traceFkChain } from '../lib/fk-chain'
 import type { SchemaData, Group, SchemaTable, LayoutType } from '../../types'
 
 interface SidebarProps {
   schemaData: SchemaData
   groups: Group[]
   onSelectGroup: (groupId: string) => void
-  onAddGroup: () => void
+  onOpenGroupModal: (initialTableName?: string | null, editGroupId?: string | null) => void
+  onAssignTableToGroup: (tableId: string, groupId: string) => void
+  onUnassignTable: (tableId: string, groupId?: string) => void
 }
 
-function IconBtn({ icon, label, onClick, active }: { icon: string; label: string; onClick: () => void; active?: boolean }) {
+function tableNameFromId(tableId: string): string {
+  return tableId.split('.').slice(1).join('.')
+}
+
+function IconBtn({
+  icon,
+  label,
+  onClick,
+  active
+}: {
+  icon: React.ReactNode
+  label: string
+  onClick: () => void
+  active?: boolean
+}) {
   const [hovered, setHovered] = useState(false)
   const leaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -40,7 +68,7 @@ function IconBtn({ icon, label, onClick, active }: { icon: string; label: string
         transition: 'background 0.15s, border-color 0.15s',
       }}
     >
-      <span style={{ lineHeight: 1 }}>{icon}</span>
+      <span style={{ lineHeight: 1, display: 'inline-flex', alignItems: 'center' }}>{icon}</span>
       <span style={{
         maxWidth: hovered ? 120 : 0,
         overflow: 'hidden', whiteSpace: 'nowrap',
@@ -54,10 +82,10 @@ function IconBtn({ icon, label, onClick, active }: { icon: string; label: string
   )
 }
 
-const LAYOUTS: { type: LayoutType; icon: string; label: string }[] = [
-  { type: 'dagre', icon: '⊟', label: 'Dagre' },
-  { type: 'force', icon: '◎', label: 'Force' },
-  { type: 'elk',   icon: '⊞', label: 'ELK' },
+const LAYOUTS: { type: LayoutType; icon: React.ReactNode; label: string }[] = [
+  { type: 'dagre', icon: <Binary size={14} strokeWidth={2} />, label: 'Dagre' },
+  { type: 'force', icon: <Network size={14} strokeWidth={2} />, label: 'Force' },
+  { type: 'elk', icon: <Boxes size={14} strokeWidth={2} />, label: 'ELK' },
 ]
 
 function LayoutDropdown() {
@@ -78,7 +106,10 @@ function LayoutDropdown() {
       <button
         onClick={e => {
           e.stopPropagation()
-          if (open) { setOpen(false); return }
+          if (open) {
+            setOpen(false)
+            return
+          }
           setDropRect(e.currentTarget.getBoundingClientRect())
           setOpen(true)
         }}
@@ -94,7 +125,9 @@ function LayoutDropdown() {
         }}
       >
         <span style={{ lineHeight: 1 }}>{current.icon}</span>
-        <span style={{ fontSize: 9, lineHeight: 1, color: open ? 'var(--accent)' : 'var(--text-3)' }}>▾</span>
+        <span style={{ lineHeight: 1, display: 'inline-flex', alignItems: 'center', color: open ? 'var(--accent)' : 'var(--text-3)' }}>
+          <ChevronDown size={12} strokeWidth={2.2} />
+        </span>
       </button>
 
       {open && dropRect && (
@@ -113,23 +146,26 @@ function LayoutDropdown() {
           }}
           onClick={e => e.stopPropagation()}
         >
-          {LAYOUTS.map(l => (
+          {LAYOUTS.map(layout => (
             <div
-              key={l.type}
+              key={layout.type}
               onClick={() => {
-                if (l.type !== layoutType) { setLayoutType(l.type); resetLayout() }
+                if (layout.type !== layoutType) {
+                  setLayoutType(layout.type)
+                  resetLayout()
+                }
                 setOpen(false)
               }}
               style={{
                 display: 'flex', alignItems: 'center', gap: 8,
                 padding: '7px 12px', cursor: 'pointer', fontSize: 12.5,
-                fontWeight: l.type === layoutType ? 700 : 500,
-                color: l.type === layoutType ? 'var(--accent)' : 'var(--text-1)',
-                background: l.type === layoutType ? 'var(--accent-light)' : 'transparent',
+                fontWeight: layout.type === layoutType ? 700 : 500,
+                color: layout.type === layoutType ? 'var(--accent)' : 'var(--text-1)',
+                background: layout.type === layoutType ? 'var(--accent-light)' : 'transparent',
               }}
             >
-              <span style={{ fontSize: 14, lineHeight: 1 }}>{l.icon}</span>
-              {l.label}
+              <span style={{ lineHeight: 1, display: 'inline-flex', alignItems: 'center' }}>{layout.icon}</span>
+              {layout.label}
             </div>
           ))}
         </div>
@@ -138,7 +174,14 @@ function LayoutDropdown() {
   )
 }
 
-export function Sidebar({ schemaData, groups, onSelectGroup, onAddGroup }: SidebarProps) {
+export function Sidebar({
+  schemaData,
+  groups,
+  onSelectGroup,
+  onOpenGroupModal,
+  onAssignTableToGroup,
+  onUnassignTable,
+}: SidebarProps) {
   const [search, setSearch] = useState('')
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; nodeId: string } | null>(null)
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
@@ -147,8 +190,8 @@ export function Sidebar({ schemaData, groups, onSelectGroup, onAddGroup }: Sideb
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const {
-    selectedTables, hiddenGroups, hiddenTables, autoExpand, compactNodes,
-    toggleTable, selectTables, toggleGroupVisibility, toggleTableVisibility,
+    selectedTables, hiddenGroups, hiddenTables, compactNodes,
+    toggleTable, toggleGroupVisibility, toggleTableVisibility,
     setZoomToTable, resetLayout, setHiddenTables, setSearchQuery, setFitToNodes, toggleCompactNodes,
   } = useStore()
 
@@ -160,35 +203,30 @@ export function Sidebar({ schemaData, groups, onSelectGroup, onAddGroup }: Sideb
 
   useEffect(() => {
     if (!ctxMenu && !groupCtxMenu) return
-    const close = () => { setCtxMenu(null); setGroupCtxMenu(null) }
+    const close = () => {
+      setCtxMenu(null)
+      setGroupCtxMenu(null)
+    }
     window.addEventListener('click', close)
     return () => window.removeEventListener('click', close)
   }, [ctxMenu, groupCtxMenu])
 
-  const tableToGroup = useMemo(() => {
-    const map = new Map<string, Group>()
+  const tableToGroups = useMemo(() => {
+    const map = new Map<string, Group[]>()
     for (const group of groups) {
-      for (const tableName of group.tables) map.set(tableName, group)
+      for (const tableName of group.tables) {
+        const existing = map.get(tableName)
+        if (existing) existing.push(group)
+        else map.set(tableName, [group])
+      }
     }
     return map
   }, [groups])
 
-  const fkNeighbors = useMemo(() => {
-    const tableByName = new Map(schemaData.tables.map(t => [t.name, t]))
-    const map = new Map<string, string[]>()
-    for (const fk of schemaData.foreignKeys) {
-      const p = tableByName.get(fk.parentTable)
-      const r = tableByName.get(fk.referencedTable)
-      if (!p || !r) continue
-      const pId = `${p.schema}.${p.name}`
-      const rId = `${r.schema}.${r.name}`
-      if (!map.has(pId)) map.set(pId, [])
-      if (!map.has(rId)) map.set(rId, [])
-      map.get(pId)!.push(rId)
-      map.get(rId)!.push(pId)
-    }
-    return map
-  }, [schemaData.tables, schemaData.foreignKeys])
+  const tableByName = useMemo(
+    () => new Map(schemaData.tables.map(table => [table.name, table])),
+    [schemaData.tables]
+  )
 
   const allTableIds = useMemo(
     () => schemaData.tables.map(t => `${t.schema}.${t.name}`),
@@ -198,21 +236,22 @@ export function Sidebar({ schemaData, groups, onSelectGroup, onAddGroup }: Sideb
   const filtered = useMemo(() => {
     const q = search.toLowerCase()
     if (!q) return schemaData.tables
-    return schemaData.tables.filter(t =>
-      t.name.toLowerCase().includes(q) ||
-      t.columns.some(c => c.name.toLowerCase().includes(q))
+    return schemaData.tables.filter(table =>
+      table.name.toLowerCase().includes(q) ||
+      table.columns.some(column => column.name.toLowerCase().includes(q))
     )
   }, [schemaData.tables, search])
 
-  // For column-matched tables: which columns matched (only when table name itself didn't match)
   const columnMatches = useMemo(() => {
     const q = search.toLowerCase()
     if (!q) return new Map<string, string[]>()
     const map = new Map<string, string[]>()
-    for (const t of filtered) {
-      if (t.name.toLowerCase().includes(q)) continue
-      const cols = t.columns.filter(c => c.name.toLowerCase().includes(q)).map(c => c.name)
-      if (cols.length) map.set(t.name, cols)
+    for (const table of filtered) {
+      if (table.name.toLowerCase().includes(q)) continue
+      const cols = table.columns
+        .filter(column => column.name.toLowerCase().includes(q))
+        .map(column => column.name)
+      if (cols.length) map.set(table.name, cols)
     }
     return map
   }, [filtered, search])
@@ -220,24 +259,25 @@ export function Sidebar({ schemaData, groups, onSelectGroup, onAddGroup }: Sideb
   const tablesByGroup = useMemo(() => {
     const map = new Map<string, SchemaTable[]>()
     for (const table of filtered) {
-      const group = tableToGroup.get(table.name)
-      if (group) {
+      const tableGroups = tableToGroups.get(table.name)
+      if (!tableGroups) continue
+      for (const group of tableGroups) {
         if (!map.has(group.id)) map.set(group.id, [])
         map.get(group.id)!.push(table)
       }
     }
     return map
-  }, [filtered, tableToGroup])
+  }, [filtered, tableToGroups])
 
   const ungroupedTables = useMemo(
-    () => filtered.filter(t => !tableToGroup.has(t.name)),
-    [filtered, tableToGroup]
+    () => filtered.filter(table => !tableToGroups.has(table.name)),
+    [filtered, tableToGroups]
   )
 
-  const allExpanded = groups.length > 0 && groups.every(g => expandedGroups.has(g.id))
+  const allExpanded = groups.length > 0 && groups.every(group => expandedGroups.has(group.id))
 
   const toggleExpandAll = () => {
-    setExpandedGroups(allExpanded ? new Set() : new Set(groups.map(g => g.id)))
+    setExpandedGroups(allExpanded ? new Set() : new Set(groups.map(group => group.id)))
   }
 
   const toggleGroupExpand = (groupId: string) => {
@@ -249,12 +289,7 @@ export function Sidebar({ schemaData, groups, onSelectGroup, onAddGroup }: Sideb
   }
 
   const handleTableClick = (nodeId: string) => {
-    const wasSelected = selectedTables.has(nodeId)
     toggleTable(nodeId)
-    if (!wasSelected && autoExpand) {
-      const neighbors = fkNeighbors.get(nodeId) ?? []
-      if (neighbors.length) selectTables([nodeId, ...neighbors])
-    }
   }
 
   const renderTableRow = (table: SchemaTable, indent = false) => {
@@ -265,7 +300,11 @@ export function Sidebar({ schemaData, groups, onSelectGroup, onAddGroup }: Sideb
     return (
       <div
         key={nodeId}
-        onContextMenu={e => { e.preventDefault(); e.stopPropagation(); setCtxMenu({ x: e.clientX, y: e.clientY, nodeId }) }}
+        onContextMenu={e => {
+          e.preventDefault()
+          e.stopPropagation()
+          setCtxMenu({ x: e.clientX, y: e.clientY, nodeId })
+        }}
         onClick={() => handleTableClick(nodeId)}
         style={{
           display: 'flex', alignItems: 'center', gap: 7,
@@ -300,19 +339,22 @@ export function Sidebar({ schemaData, groups, onSelectGroup, onAddGroup }: Sideb
     )
   }
 
+  const ctxMenuTableName = ctxMenu ? tableNameFromId(ctxMenu.nodeId) : null
+  const ctxMenuGroups = ctxMenuTableName ? tableToGroups.get(ctxMenuTableName) ?? [] : []
+  const assignableGroups = groups.filter(group => !ctxMenuGroups.some(item => item.id === group.id))
+
   return (
     <aside style={{
-      width: 272, background: 'var(--surface)',
+      width: 320, background: 'var(--surface)',
       borderRight: '1px solid var(--border)',
       display: 'flex', flexDirection: 'column',
       overflow: 'hidden', flexShrink: 0,
     }}>
-      {/* Search */}
       <div style={{ padding: '10px 14px 8px', borderBottom: '1px solid var(--border)' }}>
         <input
           value={search}
           onChange={e => handleSearch(e.target.value)}
-          placeholder="Search tables & columns…"
+          placeholder="Search tables & columns..."
           style={{
             width: '100%', padding: '7px 10px',
             border: '1px solid var(--border-strong)',
@@ -323,21 +365,29 @@ export function Sidebar({ schemaData, groups, onSelectGroup, onAddGroup }: Sideb
         />
       </div>
 
-      {/* Icon toolbar */}
       <div style={{
         padding: '6px 10px', borderBottom: '1px solid var(--border)',
         display: 'flex', alignItems: 'center', gap: 5,
       }}>
-        <IconBtn icon="↺" label="Recalc layout" onClick={resetLayout} />
-        <IconBtn icon="⊡" label="Choose visible" onClick={() => setShowTablePicker(true)} />
-        <IconBtn icon={allExpanded ? '⊟' : '⊕'} label={allExpanded ? 'Collapse all' : 'Expand all'} onClick={toggleExpandAll} active={allExpanded} />
-        <IconBtn icon="≡" label={compactNodes ? 'Show columns' : 'Headers only'} onClick={toggleCompactNodes} active={compactNodes} />
+        <IconBtn icon={<RefreshCw size={14} strokeWidth={2.2} />} label="Recalc layout" onClick={resetLayout} />
+        <IconBtn icon={<Eye size={14} strokeWidth={2.2} />} label="Choose visible" onClick={() => setShowTablePicker(true)} />
+        <IconBtn
+          icon={allExpanded ? <Maximize2 size={14} strokeWidth={2.2} /> : <Gauge size={14} strokeWidth={2.2} />}
+          label={allExpanded ? 'Collapse all' : 'Expand all'}
+          onClick={toggleExpandAll}
+          active={allExpanded}
+        />
+        <IconBtn
+          icon={<Rows3 size={14} strokeWidth={2.2} />}
+          label={compactNodes ? 'Show columns' : 'Headers only'}
+          onClick={toggleCompactNodes}
+          active={compactNodes}
+        />
         <LayoutDropdown />
         <div style={{ flex: 1 }} />
-        <IconBtn icon="⬡" label="New group" onClick={onAddGroup} />
+        <IconBtn icon={<FolderPlus size={14} strokeWidth={2.2} />} label="New group" onClick={() => onOpenGroupModal()} />
       </div>
 
-      {/* Show all hidden */}
       {hiddenTables.size > 0 && (
         <div style={{ padding: '4px 10px', borderBottom: '1px solid var(--border)' }}>
           <button
@@ -354,87 +404,140 @@ export function Sidebar({ schemaData, groups, onSelectGroup, onAddGroup }: Sideb
         </div>
       )}
 
-      {/* Table list */}
       <div style={{ flex: 1, overflowY: 'auto', padding: 6, position: 'relative' }}>
-        {/* Context menu */}
         {ctxMenu && (
           <div
             style={{
               position: 'fixed', left: ctxMenu.x, top: ctxMenu.y, zIndex: 200,
               background: 'var(--surface)', border: '1px solid var(--border)',
               borderRadius: 'var(--r-sm)', boxShadow: 'var(--shadow-lg)',
-              overflow: 'hidden', minWidth: 130,
+              overflow: 'hidden', minWidth: 180,
             }}
             onClick={e => e.stopPropagation()}
           >
             <div
-              onClick={() => { setZoomToTable(ctxMenu.nodeId); setCtxMenu(null) }}
+              onClick={() => {
+                setZoomToTable(ctxMenu.nodeId)
+                setCtxMenu(null)
+              }}
               style={{ padding: '8px 14px', fontSize: 13, cursor: 'pointer', color: 'var(--text-1)', fontWeight: 500 }}
             >
               Zoom to
             </div>
             <div
               onClick={() => {
-                selectTables(traceFkChain(ctxMenu.nodeId, fkNeighbors))
+                toggleTableVisibility(ctxMenu.nodeId)
                 setCtxMenu(null)
               }}
               style={{ padding: '8px 14px', fontSize: 13, cursor: 'pointer', color: 'var(--text-1)', fontWeight: 500, borderTop: '1px solid var(--border)' }}
             >
-              Trace FK chain
-            </div>
-            <div
-              onClick={() => { toggleTableVisibility(ctxMenu.nodeId); setCtxMenu(null) }}
-              style={{ padding: '8px 14px', fontSize: 13, cursor: 'pointer', color: 'var(--text-1)', fontWeight: 500, borderTop: '1px solid var(--border)' }}
-            >
               {hiddenTables.has(ctxMenu.nodeId) ? 'Show' : 'Hide'}
             </div>
+            {ctxMenuGroups.map(group => (
+              <div
+                key={group.id}
+                onClick={() => {
+                  onUnassignTable(ctxMenu.nodeId, group.id)
+                  setCtxMenu(null)
+                }}
+                style={{ padding: '8px 14px', fontSize: 13, cursor: 'pointer', color: 'var(--text-1)', fontWeight: 500, borderTop: '1px solid var(--border)' }}
+              >
+                Unassign from {group.name}
+              </div>
+            ))}
+            <div
+              onClick={() => {
+                onOpenGroupModal(ctxMenuTableName)
+                setCtxMenu(null)
+              }}
+              style={{ padding: '8px 14px', fontSize: 13, cursor: 'pointer', color: 'var(--text-1)', fontWeight: 500, borderTop: '1px solid var(--border)' }}
+            >
+              Add to new group
+            </div>
+            <div style={{
+              padding: '4px 12px 3px', fontSize: 10, fontWeight: 700,
+              color: 'var(--text-3)', textTransform: 'uppercase',
+              letterSpacing: '0.8px', borderBottom: '1px solid var(--border)', borderTop: '1px solid var(--border)'
+            }}>
+              Assign to group
+            </div>
+            {assignableGroups.length === 0 && (
+              <div style={{ padding: '8px 12px', fontSize: 12, color: 'var(--text-3)' }}>
+                No other groups
+              </div>
+            )}
+            {assignableGroups.map(group => (
+              <div
+                key={group.id}
+                onClick={() => {
+                  onAssignTableToGroup(ctxMenu.nodeId, group.id)
+                  setCtxMenu(null)
+                }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  padding: '8px 12px', cursor: 'pointer', fontSize: 13, color: 'var(--text-1)',
+                }}
+              >
+                <div style={{ width: 9, height: 9, borderRadius: 3, background: group.color, flexShrink: 0 }} />
+                {group.name}
+              </div>
+            ))}
           </div>
         )}
 
-        {/* Group context menu */}
         {groupCtxMenu && (() => {
-          const g = groups.find(gr => gr.id === groupCtxMenu.groupId)
+          const group = groups.find(item => item.id === groupCtxMenu.groupId)
+          if (!group) return null
+
           return (
             <div
               style={{
                 position: 'fixed', left: groupCtxMenu.x, top: groupCtxMenu.y, zIndex: 200,
                 background: 'var(--surface)', border: '1px solid var(--border)',
                 borderRadius: 'var(--r-sm)', boxShadow: 'var(--shadow-lg)',
-                overflow: 'hidden', minWidth: 140,
+                overflow: 'hidden', minWidth: 150,
               }}
               onClick={e => e.stopPropagation()}
             >
               <div
                 onClick={() => {
-                  if (g) {
-                    const ids = g.tables
-                      .map(name => schemaData.tables.find(t => t.name === name))
-                      .filter((t): t is SchemaTable => t != null)
-                      .map(t => `${t.schema}.${t.name}`)
-                    setFitToNodes(ids)
-                  }
+                  const ids = group.tables
+                    .map(name => tableByName.get(name))
+                    .filter((table): table is SchemaTable => table != null)
+                    .map(table => `${table.schema}.${table.name}`)
+                  if (ids.length > 0) setFitToNodes(ids)
                   setGroupCtxMenu(null)
                 }}
                 style={{ padding: '8px 14px', fontSize: 13, cursor: 'pointer', color: 'var(--text-1)', fontWeight: 500 }}
               >
                 Zoom to group
               </div>
+              <div
+                onClick={() => {
+                  onOpenGroupModal(null, group.id)
+                  setGroupCtxMenu(null)
+                }}
+                style={{ padding: '8px 14px', fontSize: 13, cursor: 'pointer', color: 'var(--text-1)', fontWeight: 500, borderTop: '1px solid var(--border)' }}
+              >
+                Edit group
+              </div>
             </div>
           )
         })()}
 
-        {/* Groups with collapsible tables */}
         {groups.map(group => {
           const groupTables = tablesByGroup.get(group.id) ?? []
           if (groupTables.length === 0 && search) return null
           const isExpanded = expandedGroups.has(group.id)
           const isHidden = hiddenGroups.has(group.id)
-          const displayTables = search ? groupTables : group.tables
-            .map(name => schemaData.tables.find(t => t.name === name))
-            .filter((t): t is SchemaTable => t != null)
+          const displayTables = search
+            ? groupTables
+            : group.tables
+              .map(name => tableByName.get(name))
+              .filter((table): table is SchemaTable => table != null)
 
           const totalCount = group.tables.length
-          const selectedCount = displayTables.filter(t => selectedTables.has(`${t.schema}.${t.name}`)).length
+          const selectedCount = displayTables.filter(table => selectedTables.has(`${table.schema}.${table.name}`)).length
           const allGroupSelected = selectedCount === totalCount && totalCount > 0
 
           return (
@@ -459,7 +562,7 @@ export function Sidebar({ schemaData, groups, onSelectGroup, onAddGroup }: Sideb
                     lineHeight: 1, flexShrink: 0,
                   }}
                 >
-                  {isExpanded ? '▾' : '▸'}
+                  {isExpanded ? <ChevronDown size={12} strokeWidth={2.4} /> : <ChevronRight size={12} strokeWidth={2.4} />}
                 </button>
                 <div style={{ width: 8, height: 8, borderRadius: 2, background: group.color, flexShrink: 0 }} />
                 <span
@@ -479,15 +582,14 @@ export function Sidebar({ schemaData, groups, onSelectGroup, onAddGroup }: Sideb
                   style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 10, color: 'var(--text-3)', padding: '2px 3px', lineHeight: 1 }}
                   title={isHidden ? 'Show group' : 'Hide group'}
                 >
-                  {isHidden ? '○' : '◉'}
+                  {isHidden ? 'o' : 'O'}
                 </button>
               </div>
-              {isExpanded && displayTables.map(t => renderTableRow(t, true))}
+              {isExpanded && displayTables.map(table => renderTableRow(table, true))}
             </div>
           )
         })}
 
-        {/* Ungrouped tables */}
         {ungroupedTables.length > 0 && (
           <div>
             {groups.length > 0 && (
@@ -498,12 +600,11 @@ export function Sidebar({ schemaData, groups, onSelectGroup, onAddGroup }: Sideb
                 Ungrouped
               </div>
             )}
-            {ungroupedTables.map(t => renderTableRow(t))}
+            {ungroupedTables.map(table => renderTableRow(table))}
           </div>
         )}
       </div>
 
-      {/* Table picker modal */}
       {showTablePicker && (
         <TablePicker
           tables={allTableIds}

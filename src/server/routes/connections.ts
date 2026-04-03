@@ -1,29 +1,18 @@
 import { Elysia, t } from 'elysia'
-import { readConfig, writeConfig } from '../config'
+import { createConnection, deleteConnection, listConnections, updateConnection } from '../config'
 import { getAdapter } from '../adapters'
-
-const DbTypeSchema = t.Union([
-  t.Literal('sqlserver'),
-  t.Literal('postgres'),
-  t.Literal('sqlite'),
-])
+import { DbTypeSchema } from '../route-schemas'
 
 export const connectionsRouter = new Elysia({ prefix: '/api/connections' })
-  .get('/', () => readConfig().connections)
+  .get('/', () => listConnections())
 
   .post('/', ({ body, set }) => {
-    const config = readConfig()
-    if (config.connections.some(c => c.name === body.name)) {
+    const result = createConnection(body)
+    if (!result.ok) {
       set.status = 409
       return { error: `Connection "${body.name}" already exists` }
     }
-    config.connections.push({
-      ...body,
-      excludedSchemas: body.excludedSchemas ?? [],
-      includedTables: body.includedTables ?? [],
-    })
-    writeConfig(config)
-    return body
+    return result.value
   }, {
     body: t.Object({
       name: t.String(),
@@ -66,23 +55,19 @@ export const connectionsRouter = new Elysia({ prefix: '/api/connections' })
   })
 
   .put('/:name', ({ params, body, set }) => {
-    const config = readConfig()
-    const idx = config.connections.findIndex(c => c.name === params.name)
-    if (idx === -1) {
+    const result = updateConnection(params.name, body)
+
+    if (!result.ok && result.reason === 'not_found') {
       set.status = 404
       return { error: `Connection "${params.name}" not found` }
     }
-    if (body.name !== params.name && config.connections.some(c => c.name === body.name)) {
+
+    if (!result.ok && result.reason === 'conflict') {
       set.status = 409
       return { error: `Connection "${body.name}" already exists` }
     }
-    config.connections[idx] = {
-      ...body,
-      excludedSchemas: body.excludedSchemas ?? [],
-      includedTables: body.includedTables ?? [],
-    }
-    writeConfig(config)
-    return config.connections[idx]
+
+    return result.value
   }, {
     params: t.Object({ name: t.String() }),
     body: t.Object({
@@ -96,8 +81,6 @@ export const connectionsRouter = new Elysia({ prefix: '/api/connections' })
   })
 
   .delete('/:name', ({ params }) => {
-    const config = readConfig()
-    config.connections = config.connections.filter(c => c.name !== params.name)
-    writeConfig(config)
+    deleteConnection(params.name)
     return { ok: true }
   })

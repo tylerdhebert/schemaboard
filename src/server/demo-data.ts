@@ -1,4 +1,4 @@
-import type { SchemaData } from '../types'
+import type { Column, ForeignKey, SchemaData, SchemaTable } from '../types'
 
 export const DEMO_SCHEMA: SchemaData = {
   tables: [
@@ -128,4 +128,138 @@ export const DEMO_SCHEMA: SchemaData = {
     { parentTable: 'Transactions',   parentColumn: 'OrderId',           referencedTable: 'Orders',        referencedColumn: 'Id' },
     { parentTable: 'Transactions',   parentColumn: 'PaymentMethodId',   referencedTable: 'PaymentMethods',referencedColumn: 'Id' },
   ],
+}
+
+function tableKey(table: SchemaTable): string {
+  return `${table.schema}.${table.name}`
+}
+
+function replaceColumn(columns: Column[], columnName: string, nextColumn: Column): Column[] {
+  return columns.map(column => column.name === columnName ? nextColumn : column)
+}
+
+function removeColumn(columns: Column[], columnName: string): Column[] {
+  return columns.filter(column => column.name !== columnName)
+}
+
+const CUSTOMER_SEGMENTS_TABLE: SchemaTable = {
+  schema: 'crm',
+  name: 'CustomerSegments',
+  columns: [
+    { name: 'Id', dataType: 'int', maxLength: null, numericPrecision: 10, numericScale: 0, isNullable: false, isPK: true, isFK: false, referencesTable: null, referencesColumn: null },
+    { name: 'Key', dataType: 'varchar', maxLength: 40, numericPrecision: null, numericScale: null, isNullable: false, isPK: false, isFK: false, referencesTable: null, referencesColumn: null },
+    { name: 'Name', dataType: 'nvarchar', maxLength: 120, numericPrecision: null, numericScale: null, isNullable: false, isPK: false, isFK: false, referencesTable: null, referencesColumn: null },
+    { name: 'Priority', dataType: 'tinyint', maxLength: null, numericPrecision: 3, numericScale: 0, isNullable: false, isPK: false, isFK: false, referencesTable: null, referencesColumn: null },
+  ],
+}
+
+const FULFILLMENT_EVENTS_TABLE: SchemaTable = {
+  schema: 'ops',
+  name: 'FulfillmentEvents',
+  columns: [
+    { name: 'Id', dataType: 'bigint', maxLength: null, numericPrecision: 19, numericScale: 0, isNullable: false, isPK: true, isFK: false, referencesTable: null, referencesColumn: null },
+    { name: 'OrderId', dataType: 'int', maxLength: null, numericPrecision: 10, numericScale: 0, isNullable: false, isPK: false, isFK: true, referencesTable: 'Orders', referencesColumn: 'Id' },
+    { name: 'AddressId', dataType: 'int', maxLength: null, numericPrecision: 10, numericScale: 0, isNullable: false, isPK: false, isFK: true, referencesTable: 'Addresses', referencesColumn: 'Id' },
+    { name: 'Stage', dataType: 'nvarchar', maxLength: 30, numericPrecision: null, numericScale: null, isNullable: false, isPK: false, isFK: false, referencesTable: null, referencesColumn: null },
+    { name: 'OccurredAt', dataType: 'datetime2', maxLength: null, numericPrecision: null, numericScale: null, isNullable: false, isPK: false, isFK: false, referencesTable: null, referencesColumn: null },
+    { name: 'Actor', dataType: 'nvarchar', maxLength: 80, numericPrecision: null, numericScale: null, isNullable: true, isPK: false, isFK: false, referencesTable: null, referencesColumn: null },
+  ],
+}
+
+const DEMO_SCHEMA_2_TABLES = DEMO_SCHEMA.tables
+  .filter(table => tableKey(table) !== 'audit.AuditLog')
+  .map(table => {
+    const key = tableKey(table)
+
+    if (key === 'dbo.Customers') {
+      return {
+        ...table,
+        columns: [
+          ...table.columns,
+          { name: 'SegmentId', dataType: 'int', maxLength: null, numericPrecision: 10, numericScale: 0, isNullable: true, isPK: false, isFK: true, referencesTable: 'CustomerSegments', referencesColumn: 'Id' },
+        ],
+      }
+    }
+
+    if (key === 'store.Products') {
+      return {
+        ...table,
+        columns: [
+          ...removeColumn(table.columns, 'StockQty'),
+          { name: 'AvailableQty', dataType: 'int', maxLength: null, numericPrecision: 10, numericScale: 0, isNullable: false, isPK: false, isFK: false, referencesTable: null, referencesColumn: null },
+          { name: 'CompareAtPrice', dataType: 'decimal', maxLength: null, numericPrecision: 12, numericScale: 2, isNullable: true, isPK: false, isFK: false, referencesTable: null, referencesColumn: null },
+        ].map(column => column.name === 'Price'
+          ? { ...column, numericPrecision: 12 }
+          : column),
+      }
+    }
+
+    if (key === 'store.Orders') {
+      return {
+        ...table,
+        columns: [
+          ...replaceColumn(table.columns, 'ShippingAddressId', {
+            name: 'ShippingAddressId',
+            dataType: 'int',
+            maxLength: null,
+            numericPrecision: 10,
+            numericScale: 0,
+            isNullable: false,
+            isPK: false,
+            isFK: true,
+            referencesTable: 'Addresses',
+            referencesColumn: 'Id',
+          }),
+          { name: 'CurrencyCode', dataType: 'char', maxLength: 3, numericPrecision: null, numericScale: null, isNullable: false, isPK: false, isFK: false, referencesTable: null, referencesColumn: null },
+        ].map(column => column.name === 'Status'
+          ? { ...column, maxLength: 32 }
+          : column),
+      }
+    }
+
+    if (key === 'payments.PaymentMethods') {
+      return {
+        ...table,
+        columns: removeColumn(table.columns, 'IsDefault'),
+      }
+    }
+
+    if (key === 'payments.Transactions') {
+      return {
+        ...table,
+        columns: [
+          ...replaceColumn(table.columns, 'GatewayRef', {
+            name: 'GatewayRef',
+            dataType: 'varchar',
+            maxLength: 120,
+            numericPrecision: null,
+            numericScale: null,
+            isNullable: true,
+            isPK: false,
+            isFK: false,
+            referencesTable: null,
+            referencesColumn: null,
+          }),
+          { name: 'FailureCode', dataType: 'varchar', maxLength: 30, numericPrecision: null, numericScale: null, isNullable: true, isPK: false, isFK: false, referencesTable: null, referencesColumn: null },
+        ],
+      }
+    }
+
+    return table
+  })
+
+const DEMO_SCHEMA_2_FOREIGN_KEYS: ForeignKey[] = [
+  ...DEMO_SCHEMA.foreignKeys,
+  { parentTable: 'Customers', parentColumn: 'SegmentId', referencedTable: 'CustomerSegments', referencedColumn: 'Id' },
+  { parentTable: 'FulfillmentEvents', parentColumn: 'OrderId', referencedTable: 'Orders', referencedColumn: 'Id' },
+  { parentTable: 'FulfillmentEvents', parentColumn: 'AddressId', referencedTable: 'Addresses', referencedColumn: 'Id' },
+]
+
+export const DEMO_SCHEMA_2: SchemaData = {
+  tables: [
+    ...DEMO_SCHEMA_2_TABLES,
+    CUSTOMER_SEGMENTS_TABLE,
+    FULFILLMENT_EVENTS_TABLE,
+  ],
+  foreignKeys: DEMO_SCHEMA_2_FOREIGN_KEYS,
 }

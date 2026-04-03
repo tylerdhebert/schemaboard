@@ -1,6 +1,7 @@
 node_modules/
 dist/
 schemaboard.config.json
+schemaboard.db
 .env
 .env.local
 *.env

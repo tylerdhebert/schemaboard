@@ -1,16 +1,27 @@
 import { Elysia, t } from 'elysia'
-import { readConfig, writeConfig } from '../config'
+import { createGroup, deleteGroup, listGroups, updateGroup, updateGroupMembership } from '../config'
 import { randomUUID } from 'crypto'
 
 export const groupsRouter = new Elysia({ prefix: '/api/groups' })
-  .get('/', () => readConfig().groups)
+  .get('/', () => listGroups())
+
+  .post('/membership', ({ body, set }) => {
+    const ok = updateGroupMembership(body.tableName, body.action, body.groupId)
+    if (!ok) {
+      set.status = 404
+      return { error: 'Group not found' }
+    }
+    return { ok: true }
+  }, {
+    body: t.Object({
+      tableName: t.String(),
+      action: t.Union([t.Literal('add'), t.Literal('remove'), t.Literal('clear')]),
+      groupId: t.Optional(t.String())
+    })
+  })
 
   .post('/', ({ body }) => {
-    const config = readConfig()
-    const group = { ...body, id: randomUUID() }
-    config.groups.push(group)
-    writeConfig(config)
-    return group
+    return createGroup({ ...body, id: randomUUID() })
   }, {
     body: t.Object({
       name: t.String(),
@@ -20,15 +31,12 @@ export const groupsRouter = new Elysia({ prefix: '/api/groups' })
   })
 
   .put('/:id', ({ params, body, set }) => {
-    const config = readConfig()
-    const idx = config.groups.findIndex(g => g.id === params.id)
-    if (idx === -1) {
+    const group = updateGroup(params.id, body)
+    if (!group) {
       set.status = 404
       return { error: 'Group not found' }
     }
-    config.groups[idx] = { ...config.groups[idx], ...body }
-    writeConfig(config)
-    return config.groups[idx]
+    return group
   }, {
     body: t.Object({
       name: t.Optional(t.String()),
@@ -38,8 +46,6 @@ export const groupsRouter = new Elysia({ prefix: '/api/groups' })
   })
 
   .delete('/:id', ({ params }) => {
-    const config = readConfig()
-    config.groups = config.groups.filter(g => g.id !== params.id)
-    writeConfig(config)
+    deleteGroup(params.id)
     return { ok: true }
   })

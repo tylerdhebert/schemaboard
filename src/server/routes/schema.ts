@@ -1,14 +1,14 @@
 import { Elysia, t } from 'elysia'
-import { readConfig } from '../config'
+import { getConnection } from '../config'
 import { getAdapter } from '../adapters'
-import { DEMO_SCHEMA } from '../demo-data'
+import { DEMO_SCHEMA, DEMO_SCHEMA_2 } from '../demo-data'
 
 export const schemaRouter = new Elysia({ prefix: '/api/schema' })
   .get('/demo', () => DEMO_SCHEMA)
+  .get('/demo2', () => DEMO_SCHEMA_2)
 
   .get('/', async ({ query, set }) => {
-    const config = readConfig()
-    const conn = config.connections.find(c => c.name === query.connection)
+    const conn = getConnection(query.connection)
     if (!conn) {
       set.status = 404
       return { error: `Connection "${query.connection}" not found` }
