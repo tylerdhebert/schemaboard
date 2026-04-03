@@ -73,20 +73,26 @@ function isWindowsAuth(parts: Record<string, string>): boolean {
   return val === 'true' || val === 'yes' || val === 'sspi'
 }
 
-function buildWindowsConfig(parts: Record<string, string>): sql.config {
+function buildOdbcConnStr(parts: Record<string, string>): string {
   const server = parts['datasource'] ?? parts['server'] ?? parts['address'] ?? parts['addr'] ?? ''
   const database = parts['initialcatalog'] ?? parts['database'] ?? ''
   const trustCert = ['true', 'yes'].includes((parts['trustservercertificate'] ?? '').toLowerCase())
-  return {
-    server,
-    database,
-    options: { trustedConnection: true, trustServerCertificate: trustCert },
-  }
+  return [
+    'Driver={ODBC Driver 17 for SQL Server}',
+    `Server=${server}`,
+    database ? `Database=${database}` : '',
+    'Trusted_Connection=yes',
+    trustCert ? 'TrustServerCertificate=yes' : '',
+  ].filter(Boolean).join(';') + ';'
 }
 
 function errMsg(err: unknown): string {
   if (err instanceof Error) return err.message
-  if (err && typeof err === 'object' && 'message' in err) return String((err as { message: unknown }).message)
+  if (err && typeof err === 'object') {
+    const obj = err as Record<string, unknown>
+    if (obj.message) return String(obj.message)
+    return JSON.stringify(obj)
+  }
   return String(err)
 }
 
@@ -95,8 +101,10 @@ function errMsg(err: unknown): string {
 async function connect(connectionString: string): Promise<sql.ConnectionPool> {
   const parts = parseConnStr(connectionString)
   if (isWindowsAuth(parts)) {
+    const odbcStr = buildOdbcConnStr(parts)
+    console.log('[sqlserver] Windows auth ODBC string:', odbcStr)
     const sqlWin = (await import('mssql/msnodesqlv8')).default as typeof sql
-    return sqlWin.connect(buildWindowsConfig(parts))
+    return sqlWin.connect({ connectionString: odbcStr } as unknown as sql.config)
   }
   return sql.connect(connectionString)
 }
@@ -109,6 +117,7 @@ export const sqlServerAdapter: DbAdapter = {
       const pool = await connect(connectionString)
       await pool.close()
     } catch (err) {
+      console.error('[sqlserver] testConnection error:', err)
       throw new Error(`Connection failed: ${errMsg(err)}`)
     }
   },
