@@ -96,8 +96,6 @@ function errMsg(err: unknown): string {
   return String(err)
 }
 
-// Returns an mssql ConnectionPool, using msnodesqlv8 (ODBC/SSPI) for Windows auth
-// and tedious for standard SQL auth.
 async function connect(connectionString: string): Promise<sql.ConnectionPool> {
   const parts = parseConnStr(connectionString)
   if (isWindowsAuth(parts)) {
@@ -132,7 +130,20 @@ export const sqlServerAdapter: DbAdapter = {
     }
   },
 
-  async fetchSchema(connectionString, excludedSchemas) {
+  async listTables(connectionString) {
+    let pool: sql.ConnectionPool | undefined
+    try {
+      pool = await connect(connectionString)
+      const result = await pool.request().query(
+        `SELECT TABLE_SCHEMA AS [schema], TABLE_NAME AS tableName FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE' ORDER BY TABLE_SCHEMA, TABLE_NAME`
+      )
+      return result.recordset.map((r: { schema: string; tableName: string }) => `${r.schema}.${r.tableName}`)
+    } finally {
+      await pool?.close()
+    }
+  },
+
+  async fetchSchema(connectionString, excludedSchemas, includedTables) {
     let pool: sql.ConnectionPool | undefined
     try {
       pool = await connect(connectionString)
@@ -142,9 +153,12 @@ export const sqlServerAdapter: DbAdapter = {
         pool.request().query(FKS_QUERY),
       ])
       const excluded = new Set(excludedSchemas ?? [])
-      const cols = excluded.size
-        ? colResult.recordset.filter((r: { schema: string }) => !excluded.has(r.schema))
-        : colResult.recordset
+      const included = includedTables?.length ? new Set(includedTables) : null
+      const cols = colResult.recordset.filter((r: { schema: string; tableName: string }) => {
+        if (excluded.size && excluded.has(r.schema)) return false
+        if (included && !included.has(`${r.schema}.${r.tableName}`)) return false
+        return true
+      })
       return buildSchemaData(cols, pkResult.recordset, fkResult.recordset)
     } finally {
       await pool?.close()

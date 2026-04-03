@@ -14,7 +14,7 @@ export const schemaRouter = new Elysia({ prefix: '/api/schema' })
       return { error: `Connection "${query.connection}" not found` }
     }
     try {
-      return await getAdapter(conn.type).fetchSchema(conn.connectionString, conn.excludedSchemas)
+      return await getAdapter(conn.type).fetchSchema(conn.connectionString, conn.excludedSchemas, conn.includedTables)
     } catch (err) {
       set.status = 502
       return { error: err instanceof Error ? err.message : String(err) }

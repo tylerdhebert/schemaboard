@@ -79,7 +79,20 @@ export const postgresAdapter: DbAdapter = {
     }
   },
 
-  async fetchSchema(connectionString, excludedSchemas) {
+  async listTables(connectionString) {
+    const client = new Client({ connectionString })
+    await client.connect()
+    try {
+      const result = await client.query(
+        `SELECT table_schema, table_name FROM information_schema.tables WHERE table_type = 'BASE TABLE' AND table_schema NOT IN ('pg_catalog','information_schema') ORDER BY table_schema, table_name`
+      )
+      return result.rows.map((r: { table_schema: string; table_name: string }) => `${r.table_schema}.${r.table_name}`)
+    } finally {
+      await client.end()
+    }
+  },
+
+  async fetchSchema(connectionString, excludedSchemas, includedTables) {
     const client = new Client({ connectionString })
     await client.connect()
     try {
@@ -89,9 +102,12 @@ export const postgresAdapter: DbAdapter = {
         client.query(FKS_QUERY),
       ])
       const excluded = new Set(excludedSchemas ?? [])
-      const cols = excluded.size
-        ? colResult.rows.filter((r: { schema: string }) => !excluded.has(r.schema))
-        : colResult.rows
+      const included = includedTables?.length ? new Set(includedTables) : null
+      const cols = colResult.rows.filter((r: { schema: string; tableName: string }) => {
+        if (excluded.size && excluded.has(r.schema)) return false
+        if (included && !included.has(`${r.schema}.${r.tableName}`)) return false
+        return true
+      })
       return buildSchemaData(cols, pkResult.rows, fkResult.rows)
     } finally {
       await client.end()

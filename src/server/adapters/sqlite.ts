@@ -16,15 +16,34 @@ export const sqliteAdapter: DbAdapter = {
     return ['main']
   },
 
-  async fetchSchema(connectionString, excludedSchemas) {
-    if (excludedSchemas?.includes('main')) return { tables: [], foreignKeys: [] }
+  async listTables(connectionString) {
     const db = new Database(connectionString, { readonly: true })
     try {
-      const tableNames = db
+      return db
         .query<{ name: string }, []>(
           `SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name`
         )
         .all()
+        .map(r => `main.${r.name}`)
+    } finally {
+      db.close()
+    }
+  },
+
+  async fetchSchema(connectionString, excludedSchemas, includedTables) {
+    if (excludedSchemas?.includes('main')) return { tables: [], foreignKeys: [] }
+    const db = new Database(connectionString, { readonly: true })
+    try {
+      let tableNames = db
+        .query<{ name: string }, []>(
+          `SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name`
+        )
+        .all()
+
+      if (includedTables?.length) {
+        const included = new Set(includedTables)
+        tableNames = tableNames.filter(({ name }) => included.has(`main.${name}`))
+      }
 
       const tables: SchemaTable[] = []
       const foreignKeys: ForeignKey[] = []

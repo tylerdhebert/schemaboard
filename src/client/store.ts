@@ -15,6 +15,7 @@ interface AppState {
   clearSelection: () => void
   toggleGroupVisibility: (groupId: string) => void
   toggleTableVisibility: (id: string) => void
+  setHiddenTables: (ids: string[]) => void
   setAutoExpand: (v: boolean) => void
   setFormat: (f: 'condensed' | 'ddl') => void
   setZoomToTable: (id: string | null) => void
@@ -58,6 +59,8 @@ export const useStore = create<AppState>((set) => ({
     next.has(id) ? next.delete(id) : next.add(id)
     return { hiddenTables: next }
   }),
+
+  setHiddenTables: (ids) => set({ hiddenTables: new Set(ids) }),
 
   setAutoExpand: (autoExpand) => set({ autoExpand }),
   setFormat: (format) => set({ format }),

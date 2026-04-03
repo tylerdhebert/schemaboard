@@ -2,6 +2,7 @@ import { useState, useRef } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '../api/client'
 import type { Connection, DbType } from '../../types'
+import { TablePicker } from './TablePicker'
 
 interface ConnectionModalProps {
   connections: Connection[]
@@ -30,6 +31,10 @@ export function ConnectionModal({ connections, onClose }: ConnectionModalProps) 
   const [excludedSchemas, setExcludedSchemas] = useState<string[]>([])
   const [chipInput, setChipInput] = useState('')
   const chipInputRef = useRef<HTMLInputElement>(null)
+  const [includedTables, setIncludedTables] = useState<string[]>([])
+  const [availableTables, setAvailableTables] = useState<string[] | null>(null)
+  const [tablePickerOpen, setTablePickerOpen] = useState(false)
+  const [loadingTables, setLoadingTables] = useState(false)
   const qc = useQueryClient()
 
   const addMutation = useMutation({
@@ -51,6 +56,7 @@ export function ConnectionModal({ connections, onClose }: ConnectionModalProps) 
         connectionString: connStr,
         type: dbType,
         excludedSchemas,
+        includedTables: includedTables.length ? includedTables : undefined,
       })
       if (res.error) throw new Error((res.error as { value?: { error?: string } }).value?.error ?? 'Failed to add connection')
     },
@@ -63,6 +69,8 @@ export function ConnectionModal({ connections, onClose }: ConnectionModalProps) 
       setAvailableSchemas([])
       setExcludedSchemas([])
       setChipInput('')
+      setIncludedTables([])
+      setAvailableTables(null)
     }
   })
 
@@ -116,6 +124,18 @@ export function ConnectionModal({ connections, onClose }: ConnectionModalProps) 
     }
   }
 
+  const handleLoadTables = async () => {
+    setLoadingTables(true)
+    try {
+      const res = await api.api.connections.tables.post({ connectionString: connStr, type: dbType })
+      const data = res.data as { tables: string[] } | null
+      setAvailableTables(data?.tables ?? [])
+      setTablePickerOpen(true)
+    } finally {
+      setLoadingTables(false)
+    }
+  }
+
   const toggleAvailableSchema = (schema: string) => {
     if (excludedSchemas.includes(schema)) {
       removeChip(schema)
@@ -140,6 +160,15 @@ export function ConnectionModal({ connections, onClose }: ConnectionModalProps) 
         }}
         onClick={e => e.stopPropagation()}
       >
+        {tablePickerOpen && availableTables && (
+          <TablePicker
+            tables={availableTables}
+            selected={includedTables.length ? includedTables : availableTables}
+            onChange={setIncludedTables}
+            onClose={() => setTablePickerOpen(false)}
+            title="Choose included tables"
+          />
+        )}
         <h2 style={{ fontSize: 15, fontWeight: 700, marginBottom: 20, color: 'var(--text-1)' }}>
           Manage Connections
         </h2>
@@ -284,6 +313,48 @@ export function ConnectionModal({ connections, onClose }: ConnectionModalProps) 
                 }}
               />
             </div>
+          </div>
+
+          {/* Included tables filter */}
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', marginBottom: 5, letterSpacing: '0.5px', textTransform: 'uppercase' }}>
+              Included tables
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <button
+                onClick={handleLoadTables}
+                disabled={!connStr || loadingTables}
+                style={{
+                  padding: '6px 12px', borderRadius: 'var(--r-sm)',
+                  border: '1px solid var(--border-strong)', background: 'var(--bg)',
+                  fontFamily: 'inherit', fontSize: 12, fontWeight: 600,
+                  color: 'var(--text-2)', cursor: connStr ? 'pointer' : 'not-allowed',
+                }}
+              >
+                {loadingTables ? 'Loading…' : 'Choose tables…'}
+              </button>
+              {includedTables.length > 0 && (
+                <span style={{ fontSize: 12, color: 'var(--text-3)' }}>
+                  {includedTables.length} selected
+                </span>
+              )}
+              {includedTables.length > 0 && (
+                <button
+                  onClick={() => setIncludedTables([])}
+                  style={{
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    fontSize: 11, color: 'var(--text-3)', fontFamily: 'inherit', padding: 0,
+                  }}
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+            {includedTables.length === 0 && (
+              <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 4 }}>
+                All tables loaded by default
+              </div>
+            )}
           </div>
 
           {testResult === 'error' && testError && (

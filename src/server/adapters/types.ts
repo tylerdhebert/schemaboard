@@ -4,5 +4,6 @@ export type { DbType } from '../../types'
 export interface DbAdapter {
   testConnection(connectionString: string): Promise<void>
   listSchemas(connectionString: string): Promise<string[]>
-  fetchSchema(connectionString: string, excludedSchemas?: string[]): Promise<SchemaData>
+  listTables(connectionString: string): Promise<string[]>  // qualified "schema.table"
+  fetchSchema(connectionString: string, excludedSchemas?: string[], includedTables?: string[]): Promise<SchemaData>
 }

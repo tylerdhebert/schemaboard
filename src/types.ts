@@ -38,6 +38,7 @@ export interface Connection {
   connectionString: string
   type: DbType
   excludedSchemas?: string[]
+  includedTables?: string[]   // qualified "schema.table"; empty/absent = all tables
 }
 
 export interface Group {
