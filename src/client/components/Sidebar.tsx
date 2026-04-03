@@ -177,10 +177,27 @@ export function Sidebar({ schemaData, groups, onSelectGroup, onAddGroup }: Sideb
     [schemaData.tables]
   )
 
-  const filtered = useMemo(() =>
-    schemaData.tables.filter(t => t.name.toLowerCase().includes(search.toLowerCase())),
-    [schemaData.tables, search]
-  )
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase()
+    if (!q) return schemaData.tables
+    return schemaData.tables.filter(t =>
+      t.name.toLowerCase().includes(q) ||
+      t.columns.some(c => c.name.toLowerCase().includes(q))
+    )
+  }, [schemaData.tables, search])
+
+  // For column-matched tables: which columns matched (only when table name itself didn't match)
+  const columnMatches = useMemo(() => {
+    const q = search.toLowerCase()
+    if (!q) return new Map<string, string[]>()
+    const map = new Map<string, string[]>()
+    for (const t of filtered) {
+      if (t.name.toLowerCase().includes(q)) continue
+      const cols = t.columns.filter(c => c.name.toLowerCase().includes(q)).map(c => c.name)
+      if (cols.length) map.set(t.name, cols)
+    }
+    return map
+  }, [filtered, search])
 
   const tablesByGroup = useMemo(() => {
     const map = new Map<string, SchemaTable[]>()
@@ -236,6 +253,7 @@ export function Sidebar({ schemaData, groups, onSelectGroup, onAddGroup }: Sideb
     const nodeId = `${table.schema}.${table.name}`
     const isSelected = selectedTables.has(nodeId)
     const isHidden = hiddenTables.has(nodeId)
+    const matchedCols = columnMatches.get(table.name)
     return (
       <div
         key={nodeId}
@@ -249,14 +267,25 @@ export function Sidebar({ schemaData, groups, onSelectGroup, onAddGroup }: Sideb
           opacity: isHidden ? 0.35 : 1,
         }}
       >
-        <span style={{
-          fontSize: 12.5, fontWeight: 500, flex: 1,
-          color: isSelected ? 'var(--sel)' : 'var(--text-1)',
-          textDecoration: isHidden ? 'line-through' : 'none',
-        }}>
-          {table.name}
-        </span>
-        <span style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 500 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{
+            fontSize: 12.5, fontWeight: 500,
+            color: isSelected ? 'var(--sel)' : 'var(--text-1)',
+            textDecoration: isHidden ? 'line-through' : 'none',
+          }}>
+            {table.name}
+          </div>
+          {matchedCols && (
+            <div style={{
+              fontSize: 10.5, color: 'var(--accent)', fontWeight: 500,
+              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+              marginTop: 1,
+            }}>
+              {matchedCols.join(', ')}
+            </div>
+          )}
+        </div>
+        <span style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 500, flexShrink: 0 }}>
           {table.columns.length}
         </span>
       </div>
