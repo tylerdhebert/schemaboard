@@ -132,12 +132,13 @@ export function Sidebar({ schemaData, groups, onSelectGroup, onAddGroup }: Sideb
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; nodeId: string } | null>(null)
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
   const [showTablePicker, setShowTablePicker] = useState(false)
+  const [groupCtxMenu, setGroupCtxMenu] = useState<{ x: number; y: number; groupId: string } | null>(null)
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const {
     selectedTables, hiddenGroups, hiddenTables, autoExpand,
     toggleTable, selectTables, toggleGroupVisibility, toggleTableVisibility,
-    setZoomToTable, resetLayout, setHiddenTables, setSearchQuery,
+    setZoomToTable, resetLayout, setHiddenTables, setSearchQuery, setFitToNodes,
   } = useStore()
 
   const handleSearch = (value: string) => {
@@ -147,11 +148,11 @@ export function Sidebar({ schemaData, groups, onSelectGroup, onAddGroup }: Sideb
   }
 
   useEffect(() => {
-    if (!ctxMenu) return
-    const close = () => setCtxMenu(null)
+    if (!ctxMenu && !groupCtxMenu) return
+    const close = () => { setCtxMenu(null); setGroupCtxMenu(null) }
     window.addEventListener('click', close)
     return () => window.removeEventListener('click', close)
-  }, [ctxMenu])
+  }, [ctxMenu, groupCtxMenu])
 
   const tableToGroup = useMemo(() => {
     const map = new Map<string, Group>()
@@ -254,7 +255,7 @@ export function Sidebar({ schemaData, groups, onSelectGroup, onAddGroup }: Sideb
 
   return (
     <aside style={{
-      width: 234, background: 'var(--surface)',
+      width: 272, background: 'var(--surface)',
       borderRight: '1px solid var(--border)',
       display: 'flex', flexDirection: 'column',
       overflow: 'hidden', flexShrink: 0,
@@ -264,7 +265,7 @@ export function Sidebar({ schemaData, groups, onSelectGroup, onAddGroup }: Sideb
         <input
           value={search}
           onChange={e => handleSearch(e.target.value)}
-          placeholder="Search tables…"
+          placeholder="Search tables & columns…"
           style={{
             width: '100%', padding: '7px 10px',
             border: '1px solid var(--border-strong)',
@@ -333,6 +334,38 @@ export function Sidebar({ schemaData, groups, onSelectGroup, onAddGroup }: Sideb
           </div>
         )}
 
+        {/* Group context menu */}
+        {groupCtxMenu && (() => {
+          const g = groups.find(gr => gr.id === groupCtxMenu.groupId)
+          return (
+            <div
+              style={{
+                position: 'fixed', left: groupCtxMenu.x, top: groupCtxMenu.y, zIndex: 200,
+                background: 'var(--surface)', border: '1px solid var(--border)',
+                borderRadius: 'var(--r-sm)', boxShadow: 'var(--shadow-lg)',
+                overflow: 'hidden', minWidth: 140,
+              }}
+              onClick={e => e.stopPropagation()}
+            >
+              <div
+                onClick={() => {
+                  if (g) {
+                    const ids = g.tables
+                      .map(name => schemaData.tables.find(t => t.name === name))
+                      .filter((t): t is SchemaTable => t != null)
+                      .map(t => `${t.schema}.${t.name}`)
+                    setFitToNodes(ids)
+                  }
+                  setGroupCtxMenu(null)
+                }}
+                style={{ padding: '8px 14px', fontSize: 13, cursor: 'pointer', color: 'var(--text-1)', fontWeight: 500 }}
+              >
+                Zoom to group
+              </div>
+            </div>
+          )
+        })()}
+
         {/* Groups with collapsible tables */}
         {groups.map(group => {
           const groupTables = tablesByGroup.get(group.id) ?? []
@@ -345,11 +378,18 @@ export function Sidebar({ schemaData, groups, onSelectGroup, onAddGroup }: Sideb
 
           return (
             <div key={group.id} style={{ marginBottom: 2 }}>
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: 5,
-                padding: '4px 4px 4px 2px', borderRadius: 'var(--r-sm)',
-                opacity: isHidden ? 0.5 : 1,
-              }}>
+              <div
+                onContextMenu={e => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  setGroupCtxMenu({ x: e.clientX, y: e.clientY, groupId: group.id })
+                }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 5,
+                  padding: '4px 4px 4px 2px', borderRadius: 'var(--r-sm)',
+                  opacity: isHidden ? 0.5 : 1,
+                }}
+              >
                 <button
                   onClick={() => toggleGroupExpand(group.id)}
                   style={{

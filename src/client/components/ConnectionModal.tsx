@@ -22,6 +22,7 @@ const CONN_STR_PLACEHOLDER: Record<DbType, string> = {
 }
 
 export function ConnectionModal({ connections, onClose }: ConnectionModalProps) {
+  const [editingName, setEditingName] = useState<string | null>(null)
   const [name, setName] = useState('')
   const [connStr, setConnStr] = useState('')
   const [dbType, setDbType] = useState<DbType>('sqlserver')
@@ -37,9 +38,36 @@ export function ConnectionModal({ connections, onClose }: ConnectionModalProps) 
   const [loadingTables, setLoadingTables] = useState(false)
   const qc = useQueryClient()
 
-  const addMutation = useMutation({
+  const resetForm = () => {
+    setEditingName(null)
+    setName('')
+    setConnStr('')
+    setDbType('sqlserver')
+    setTestResult('idle')
+    setTestError('')
+    setAvailableSchemas([])
+    setExcludedSchemas([])
+    setChipInput('')
+    setIncludedTables([])
+    setAvailableTables(null)
+  }
+
+  const startEdit = (conn: Connection) => {
+    setEditingName(conn.name)
+    setName(conn.name)
+    setConnStr(conn.connectionString)
+    setDbType(conn.type)
+    setExcludedSchemas(conn.excludedSchemas ?? [])
+    setIncludedTables(conn.includedTables ?? [])
+    setAvailableSchemas([])
+    setTestResult('idle')
+    setTestError('')
+    setChipInput('')
+    setAvailableTables(null)
+  }
+
+  const saveMutation = useMutation({
     mutationFn: async () => {
-      // Test before saving
       const testRes = await api.api.connections.test.post({ connectionString: connStr, type: dbType })
       const testData = testRes.data as { ok: boolean; schemas?: string[]; error?: string } | null
       if (testRes.error || !testData?.ok) {
@@ -51,26 +79,26 @@ export function ConnectionModal({ connections, onClose }: ConnectionModalProps) 
       setTestResult('ok')
       setAvailableSchemas(testData.schemas ?? [])
 
-      const res = await api.api.connections.post({
+      const payload = {
         name,
         connectionString: connStr,
         type: dbType,
         excludedSchemas,
         includedTables: includedTables.length ? includedTables : undefined,
-      })
-      if (res.error) throw new Error((res.error as { value?: { error?: string } }).value?.error ?? 'Failed to add connection')
+      }
+
+      if (editingName !== null) {
+        const encoded = encodeURIComponent(editingName)
+        const res = await api.api.connections({ name: encoded }).put(payload)
+        if (res.error) throw new Error((res.error as { value?: { error?: string } }).value?.error ?? 'Failed to save')
+      } else {
+        const res = await api.api.connections.post(payload)
+        if (res.error) throw new Error((res.error as { value?: { error?: string } }).value?.error ?? 'Failed to add connection')
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['connections'] })
-      setName('')
-      setConnStr('')
-      setDbType('sqlserver')
-      setTestResult('idle')
-      setAvailableSchemas([])
-      setExcludedSchemas([])
-      setChipInput('')
-      setIncludedTables([])
-      setAvailableTables(null)
+      resetForm()
     }
   })
 
@@ -188,6 +216,15 @@ export function ConnectionModal({ connections, onClose }: ConnectionModalProps) 
             <span style={{ flex: 1, fontSize: 13, fontWeight: 500, color: 'var(--text-1)' }}>{c.name}</span>
             <span style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 500 }}>{DB_TYPE_LABELS[c.type]}</span>
             <button
+              onClick={() => startEdit(c)}
+              style={{
+                background: 'none', border: 'none', color: 'var(--accent)',
+                cursor: 'pointer', fontSize: 13, fontFamily: 'inherit',
+              }}
+            >
+              Edit
+            </button>
+            <button
               onClick={() => deleteMutation.mutate(c.name)}
               style={{
                 background: 'none', border: 'none', color: 'var(--text-3)',
@@ -200,6 +237,12 @@ export function ConnectionModal({ connections, onClose }: ConnectionModalProps) 
         ))}
 
         <div style={{ marginTop: 20, display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {editingName !== null && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent)' }}>Editing "{editingName}"</span>
+              <button onClick={resetForm} style={{ background: 'none', border: 'none', fontSize: 12, color: 'var(--text-3)', cursor: 'pointer', fontFamily: 'inherit' }}>Cancel</button>
+            </div>
+          )}
           {/* DB type segmented control */}
           <div style={{
             display: 'flex', gap: 2,
@@ -228,7 +271,7 @@ export function ConnectionModal({ connections, onClose }: ConnectionModalProps) 
             value={name}
             onChange={e => setName(e.target.value)}
             placeholder="Connection name (e.g. Local Dev)"
-            style={inputStyle}
+            style={{ ...inputStyle, opacity: editingName !== null ? 0.6 : 1 }}
           />
           <input
             value={connStr}
@@ -377,8 +420,8 @@ export function ConnectionModal({ connections, onClose }: ConnectionModalProps) 
               {testResult === 'ok' ? '✓ Connected' : testResult === 'error' ? '✗ Failed' : 'Test'}
             </button>
             <button
-              onClick={() => addMutation.mutate()}
-              disabled={!name || !connStr || addMutation.isPending}
+              onClick={() => saveMutation.mutate()}
+              disabled={!name || !connStr || saveMutation.isPending}
               style={{
                 flex: 1, padding: '8px 14px', borderRadius: 'var(--r-sm)',
                 background: name && connStr ? 'var(--accent-grad)' : 'rgba(255,255,255,0.1)',
@@ -386,7 +429,9 @@ export function ConnectionModal({ connections, onClose }: ConnectionModalProps) 
                 fontFamily: 'inherit', fontSize: 13, fontWeight: 700,
               }}
             >
-              {addMutation.isPending ? (testResult === 'ok' ? 'Adding…' : 'Testing…') : 'Add Connection'}
+              {saveMutation.isPending
+                ? (testResult === 'ok' ? (editingName ? 'Saving…' : 'Adding…') : 'Testing…')
+                : (editingName ? 'Save Changes' : 'Add Connection')}
             </button>
           </div>
         </div>

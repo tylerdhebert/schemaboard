@@ -28,8 +28,10 @@ function matchesSearch(table: SchemaTable, query: string): boolean {
 }
 
 function ZoomController() {
-  const { zoomToTable, setZoomToTable } = useStore()
-  const { getNode, setCenter } = useReactFlow()
+  const { zoomToTable, setZoomToTable, fitToNodes, setFitToNodes, fitViewKey } = useStore()
+  const { getNode, setCenter, fitView } = useReactFlow()
+  const prevFitViewKey = useRef(fitViewKey)
+
   useEffect(() => {
     if (!zoomToTable) return
     setZoomToTable(null)
@@ -39,6 +41,19 @@ function ZoomController() {
     const h = node.measured?.height ?? 80
     setCenter(node.position.x + w / 2, node.position.y + h / 2, { zoom: 1.5, duration: 500 })
   }, [zoomToTable, getNode, setCenter, setZoomToTable])
+
+  useEffect(() => {
+    if (!fitToNodes) return
+    setFitToNodes(null)
+    fitView({ nodes: fitToNodes.map(id => ({ id })), duration: 500, padding: 0.2 })
+  }, [fitToNodes, setFitToNodes, fitView])
+
+  useEffect(() => {
+    if (prevFitViewKey.current === fitViewKey) return
+    prevFitViewKey.current = fitViewKey
+    fitView({ duration: 400, padding: 0.15 })
+  }, [fitViewKey, fitView])
+
   return null
 }
 
@@ -48,7 +63,7 @@ interface CanvasProps {
 }
 
 export function Canvas({ schemaData, groups }: CanvasProps) {
-  const { selectedTables, hiddenGroups, hiddenTables, autoExpand, layoutKey, layoutType, searchQuery, toggleTable, selectTables } = useStore()
+  const { selectedTables, hiddenGroups, hiddenTables, autoExpand, layoutKey, layoutType, searchQuery, toggleTable, selectTables, triggerFitView } = useStore()
 
   const tableToGroup = useMemo(() => {
     const map = new Map<string, Group>()
@@ -139,6 +154,8 @@ export function Canvas({ schemaData, groups }: CanvasProps) {
         }
       })
     })
+
+    if (isNewLayout && baseLayout.fresh) triggerFitView()
 
     setRfEdges(baseLayout.edges.map(edge => {
       const srcSel = selectedTables.has(edge.source as string)

@@ -9,6 +9,8 @@ interface AppState {
   autoExpand: boolean
   format: 'condensed' | 'ddl'
   zoomToTable: string | null
+  fitToNodes: string[] | null
+  fitViewKey: number
   layoutKey: number
   layoutType: LayoutType
   searchQuery: string
@@ -22,6 +24,8 @@ interface AppState {
   setAutoExpand: (v: boolean) => void
   setFormat: (f: 'condensed' | 'ddl') => void
   setZoomToTable: (id: string | null) => void
+  setFitToNodes: (ids: string[] | null) => void
+  triggerFitView: () => void
   resetLayout: () => void
   setLayoutType: (t: LayoutType) => void
   setSearchQuery: (q: string) => void
@@ -35,6 +39,8 @@ export const useStore = create<AppState>((set) => ({
   autoExpand: true,
   format: 'condensed',
   zoomToTable: null,
+  fitToNodes: null,
+  fitViewKey: 0,
   layoutKey: 0,
   layoutType: 'dagre',
   searchQuery: '',
@@ -72,6 +78,8 @@ export const useStore = create<AppState>((set) => ({
   setAutoExpand: (autoExpand) => set({ autoExpand }),
   setFormat: (format) => set({ format }),
   setZoomToTable: (zoomToTable) => set({ zoomToTable }),
+  setFitToNodes: (fitToNodes) => set({ fitToNodes }),
+  triggerFitView: () => set((s) => ({ fitViewKey: s.fitViewKey + 1 })),
   resetLayout: () => set((s) => ({ layoutKey: s.layoutKey + 1 })),
   setLayoutType: (layoutType) => set({ layoutType }),
   setSearchQuery: (searchQuery) => set({ searchQuery }),

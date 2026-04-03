@@ -64,6 +64,35 @@ export const connectionsRouter = new Elysia({ prefix: '/api/connections' })
     })
   })
 
+  .put('/:name', ({ params, body, set }) => {
+    const config = readConfig()
+    const idx = config.connections.findIndex(c => c.name === params.name)
+    if (idx === -1) {
+      set.status = 404
+      return { error: `Connection "${params.name}" not found` }
+    }
+    if (body.name !== params.name && config.connections.some(c => c.name === body.name)) {
+      set.status = 409
+      return { error: `Connection "${body.name}" already exists` }
+    }
+    config.connections[idx] = {
+      ...body,
+      excludedSchemas: body.excludedSchemas ?? [],
+      includedTables: body.includedTables ?? [],
+    }
+    writeConfig(config)
+    return config.connections[idx]
+  }, {
+    params: t.Object({ name: t.String() }),
+    body: t.Object({
+      name: t.String(),
+      connectionString: t.String(),
+      type: DbTypeSchema,
+      excludedSchemas: t.Optional(t.Array(t.String())),
+      includedTables: t.Optional(t.Array(t.String())),
+    })
+  })
+
   .delete('/:name', ({ params }) => {
     const config = readConfig()
     config.connections = config.connections.filter(c => c.name !== params.name)
