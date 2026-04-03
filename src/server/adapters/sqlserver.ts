@@ -84,6 +84,12 @@ function buildWindowsConfig(parts: Record<string, string>): sql.config {
   }
 }
 
+function errMsg(err: unknown): string {
+  if (err instanceof Error) return err.message
+  if (err && typeof err === 'object' && 'message' in err) return String((err as { message: unknown }).message)
+  return String(err)
+}
+
 // Returns an mssql ConnectionPool, using msnodesqlv8 (ODBC/SSPI) for Windows auth
 // and tedious for standard SQL auth.
 async function connect(connectionString: string): Promise<sql.ConnectionPool> {
@@ -103,7 +109,7 @@ export const sqlServerAdapter: DbAdapter = {
       const pool = await connect(connectionString)
       await pool.close()
     } catch (err) {
-      throw new Error(`Connection failed: ${err instanceof Error ? err.message : String(err)}`)
+      throw new Error(`Connection failed: ${errMsg(err)}`)
     }
   },
 
