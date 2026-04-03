@@ -7,6 +7,7 @@ interface TableNodeData {
   group: Group | null
   selected: boolean
   dim: boolean
+  matched?: boolean
 }
 
 interface TableNodeProps {
@@ -15,7 +16,7 @@ interface TableNodeProps {
 }
 
 export const TableNode = memo(function TableNode({ id, data }: TableNodeProps) {
-  const { table, group, selected, dim } = data
+  const { table, group, selected, dim, matched } = data
   const groupColor = group?.color ?? 'var(--text-3)'
 
   return (
@@ -23,10 +24,16 @@ export const TableNode = memo(function TableNode({ id, data }: TableNodeProps) {
       data-table-id={id}
       style={{
         background: 'var(--surface)',
-        border: selected ? '1.5px solid var(--sel)' : '1.5px solid var(--border)',
+        border: selected
+          ? '1.5px solid var(--sel)'
+          : matched
+          ? '1.5px solid rgba(251,191,36,0.85)'
+          : '1.5px solid var(--border)',
         borderRadius: 'var(--r)',
         boxShadow: selected
           ? '0 0 0 4px var(--sel-ring), var(--shadow-md)'
+          : matched
+          ? '0 0 0 3px rgba(251,191,36,0.25), var(--shadow-md)'
           : 'var(--shadow-md)',
         minWidth: 200,
         overflow: 'hidden',

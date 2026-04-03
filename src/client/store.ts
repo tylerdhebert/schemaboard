@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import type { LayoutType } from '../types'
 
 interface AppState {
   activeConnection: string | null
@@ -9,6 +10,8 @@ interface AppState {
   format: 'condensed' | 'ddl'
   zoomToTable: string | null
   layoutKey: number
+  layoutType: LayoutType
+  searchQuery: string
   setActiveConnection: (name: string) => void
   toggleTable: (id: string) => void
   selectTables: (ids: string[]) => void
@@ -20,6 +23,8 @@ interface AppState {
   setFormat: (f: 'condensed' | 'ddl') => void
   setZoomToTable: (id: string | null) => void
   resetLayout: () => void
+  setLayoutType: (t: LayoutType) => void
+  setSearchQuery: (q: string) => void
 }
 
 export const useStore = create<AppState>((set) => ({
@@ -31,6 +36,8 @@ export const useStore = create<AppState>((set) => ({
   format: 'condensed',
   zoomToTable: null,
   layoutKey: 0,
+  layoutType: 'dagre',
+  searchQuery: '',
 
   setActiveConnection: (name) => set({ activeConnection: name, selectedTables: new Set(), hiddenTables: new Set() }),
 
@@ -66,4 +73,6 @@ export const useStore = create<AppState>((set) => ({
   setFormat: (format) => set({ format }),
   setZoomToTable: (zoomToTable) => set({ zoomToTable }),
   resetLayout: () => set((s) => ({ layoutKey: s.layoutKey + 1 })),
+  setLayoutType: (layoutType) => set({ layoutType }),
+  setSearchQuery: (searchQuery) => set({ searchQuery }),
 }))

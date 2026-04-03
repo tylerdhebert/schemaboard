@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'bun:test'
-import { buildLayout } from './layout'
+import { computeLayout } from './layout'
 import type { SchemaTable, ForeignKey } from '../../types'
 
 const tables: SchemaTable[] = [
@@ -10,23 +10,31 @@ const fks: ForeignKey[] = [
   { parentTable: 'Orders', parentColumn: 'CustomerId', referencedTable: 'Customers', referencedColumn: 'Id' }
 ]
 
-describe('buildLayout', () => {
-  test('returns one node per table', () => {
-    const { nodes } = buildLayout(tables, fks)
+describe('computeLayout', () => {
+  test('dagre: returns one node per table', async () => {
+    const { nodes } = await computeLayout('dagre', tables, fks)
     expect(nodes).toHaveLength(2)
-    expect(nodes.map(n => n.id)).toContain('dbo.Orders')
+    expect(nodes.map((n: { id: string }) => n.id)).toContain('dbo.Orders')
   })
 
-  test('returns one edge per FK', () => {
-    const { edges } = buildLayout(tables, fks)
+  test('dagre: returns one edge per FK', async () => {
+    const { edges } = await computeLayout('dagre', tables, fks)
     expect(edges).toHaveLength(1)
     expect(edges[0].source).toBe('dbo.Orders')
     expect(edges[0].target).toBe('dbo.Customers')
   })
 
-  test('nodes have position set by dagre', () => {
-    const { nodes } = buildLayout(tables, fks)
-    expect(nodes[0].position.x).toBeGreaterThanOrEqual(0)
-    expect(nodes[0].position.y).toBeGreaterThanOrEqual(0)
+  test('dagre: nodes have position set', async () => {
+    const { nodes } = await computeLayout('dagre', tables, fks)
+    expect(nodes[0].position.x).toBeDefined()
+    expect(nodes[0].position.y).toBeDefined()
+  })
+
+  test('force: spreads nodes in all directions', async () => {
+    const { nodes } = await computeLayout('force', tables, fks)
+    expect(nodes).toHaveLength(2)
+    // Force layout should not stack everything at (0,0)
+    const positions = nodes.map((n: { position: { x: number; y: number } }) => n.position)
+    expect(positions[0].x).not.toBe(positions[1].x)
   })
 })

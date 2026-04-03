@@ -1,6 +1,7 @@
 // src/types.ts
 
 export type DbType = 'sqlserver' | 'postgres' | 'sqlite'
+export type LayoutType = 'dagre' | 'force' | 'elk'
 
 export interface Column {
   name: string

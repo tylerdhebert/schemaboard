@@ -1,7 +1,7 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { useStore } from '../store'
 import { TablePicker } from './TablePicker'
-import type { SchemaData, Group, SchemaTable } from '../../types'
+import type { SchemaData, Group, SchemaTable, LayoutType } from '../../types'
 
 interface SidebarProps {
   schemaData: SchemaData
@@ -43,17 +43,108 @@ function IconBtn({ icon, label, onClick, active }: { icon: string; label: string
   )
 }
 
+const LAYOUTS: { type: LayoutType; icon: string; label: string }[] = [
+  { type: 'dagre', icon: '⊟', label: 'Dagre' },
+  { type: 'force', icon: '◎', label: 'Force' },
+  { type: 'elk',   icon: '⊞', label: 'ELK' },
+]
+
+function LayoutDropdown() {
+  const { layoutType, setLayoutType, resetLayout } = useStore()
+  const [open, setOpen] = useState(false)
+  const [dropRect, setDropRect] = useState<DOMRect | null>(null)
+  const current = LAYOUTS.find(l => l.type === layoutType)!
+
+  useEffect(() => {
+    if (!open) return
+    const close = () => setOpen(false)
+    window.addEventListener('click', close)
+    return () => window.removeEventListener('click', close)
+  }, [open])
+
+  return (
+    <div style={{ position: 'relative', flexShrink: 0 }}>
+      <button
+        onClick={e => {
+          e.stopPropagation()
+          if (open) { setOpen(false); return }
+          setDropRect(e.currentTarget.getBoundingClientRect())
+          setOpen(true)
+        }}
+        title="Switch layout algorithm"
+        style={{
+          display: 'inline-flex', alignItems: 'center', gap: 4,
+          padding: '5px 7px', borderRadius: 'var(--r-sm)',
+          border: `1px solid ${open ? 'var(--accent)' : 'var(--border-strong)'}`,
+          background: open ? 'var(--accent-light)' : 'none',
+          cursor: 'pointer', fontFamily: 'inherit', fontSize: 14,
+          color: open ? 'var(--accent)' : 'var(--text-3)',
+          transition: 'background 0.15s, border-color 0.15s',
+        }}
+      >
+        <span style={{ lineHeight: 1 }}>{current.icon}</span>
+        <span style={{ fontSize: 9, lineHeight: 1, color: open ? 'var(--accent)' : 'var(--text-3)' }}>▾</span>
+      </button>
+
+      {open && dropRect && (
+        <div
+          style={{
+            position: 'fixed',
+            left: dropRect.left,
+            top: dropRect.bottom + 4,
+            zIndex: 300,
+            background: 'var(--surface)',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--r-sm)',
+            boxShadow: 'var(--shadow-lg)',
+            overflow: 'hidden',
+            minWidth: 110,
+          }}
+          onClick={e => e.stopPropagation()}
+        >
+          {LAYOUTS.map(l => (
+            <div
+              key={l.type}
+              onClick={() => {
+                if (l.type !== layoutType) { setLayoutType(l.type); resetLayout() }
+                setOpen(false)
+              }}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                padding: '7px 12px', cursor: 'pointer', fontSize: 12.5,
+                fontWeight: l.type === layoutType ? 700 : 500,
+                color: l.type === layoutType ? 'var(--accent)' : 'var(--text-1)',
+                background: l.type === layoutType ? 'var(--accent-light)' : 'transparent',
+              }}
+            >
+              <span style={{ fontSize: 14, lineHeight: 1 }}>{l.icon}</span>
+              {l.label}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function Sidebar({ schemaData, groups, onSelectGroup, onAddGroup }: SidebarProps) {
   const [search, setSearch] = useState('')
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; nodeId: string } | null>(null)
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
   const [showTablePicker, setShowTablePicker] = useState(false)
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const {
     selectedTables, hiddenGroups, hiddenTables, autoExpand,
     toggleTable, selectTables, toggleGroupVisibility, toggleTableVisibility,
-    setZoomToTable, resetLayout, setHiddenTables,
+    setZoomToTable, resetLayout, setHiddenTables, setSearchQuery,
   } = useStore()
+
+  const handleSearch = (value: string) => {
+    setSearch(value)
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
+    searchTimerRef.current = setTimeout(() => setSearchQuery(value), 200)
+  }
 
   useEffect(() => {
     if (!ctxMenu) return
@@ -172,7 +263,7 @@ export function Sidebar({ schemaData, groups, onSelectGroup, onAddGroup }: Sideb
       <div style={{ padding: '10px 14px 8px', borderBottom: '1px solid var(--border)' }}>
         <input
           value={search}
-          onChange={e => setSearch(e.target.value)}
+          onChange={e => handleSearch(e.target.value)}
           placeholder="Search tables…"
           style={{
             width: '100%', padding: '7px 10px',
@@ -192,17 +283,9 @@ export function Sidebar({ schemaData, groups, onSelectGroup, onAddGroup }: Sideb
         <IconBtn icon="↺" label="Recalc layout" onClick={resetLayout} />
         <IconBtn icon="⊡" label="Choose visible" onClick={() => setShowTablePicker(true)} />
         <IconBtn icon={allExpanded ? '⊟' : '⊕'} label={allExpanded ? 'Collapse all' : 'Expand all'} onClick={toggleExpandAll} active={allExpanded} />
+        <LayoutDropdown />
         <div style={{ flex: 1 }} />
-        <button
-          onClick={onAddGroup}
-          style={{
-            fontSize: 11, fontWeight: 600, color: 'var(--text-3)',
-            background: 'none', border: 'none', cursor: 'pointer',
-            fontFamily: 'inherit', padding: '4px 2px', whiteSpace: 'nowrap',
-          }}
-        >
-          + Group
-        </button>
+        <IconBtn icon="⬡" label="New group" onClick={onAddGroup} />
       </div>
 
       {/* Show all hidden */}
