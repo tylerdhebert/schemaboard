@@ -1,5 +1,5 @@
 import sql from 'mssql'
-import { buildSchemaData } from './shared'
+import { buildSchemaData, filterColumns } from './shared'
 import type { DbAdapter } from './types'
 
 const COLUMNS_QUERY = `
@@ -152,13 +152,7 @@ export const sqlServerAdapter: DbAdapter = {
         pool.request().query(PKS_QUERY),
         pool.request().query(FKS_QUERY),
       ])
-      const excluded = new Set(excludedSchemas ?? [])
-      const included = includedTables?.length ? new Set(includedTables) : null
-      const cols = colResult.recordset.filter((r: { schema: string; tableName: string }) => {
-        if (excluded.size && excluded.has(r.schema)) return false
-        if (included && !included.has(`${r.schema}.${r.tableName}`)) return false
-        return true
-      })
+      const cols = filterColumns(colResult.recordset, excludedSchemas, includedTables)
       return buildSchemaData(cols, pkResult.recordset, fkResult.recordset)
     } finally {
       await pool?.close()

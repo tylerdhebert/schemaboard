@@ -14,9 +14,6 @@ function formatType(col: Column): string {
 }
 
 export function generateCondensed(tables: SchemaTable[], foreignKeys: ForeignKey[]): string {
-  const relevantTableNames = new Set(tables.map(t => t.name))
-  const relevantFKs = foreignKeys.filter(fk => relevantTableNames.has(fk.parentTable))
-
   const tableLines = tables.map(table => {
     const cols = table.columns.map(col => {
       if (col.isPK) return `${col.name} PK`
@@ -28,9 +25,9 @@ export function generateCondensed(tables: SchemaTable[], foreignKeys: ForeignKey
   })
 
   const lines = tableLines.join('\n\n')
-  if (relevantFKs.length === 0) return lines
+  if (foreignKeys.length === 0) return lines
 
-  const relLines = relevantFKs.map(
+  const relLines = foreignKeys.map(
     fk => `- ${fk.parentTable}.${fk.parentColumn} → ${fk.referencedTable}.${fk.referencedColumn}`
   )
   return `${lines}\n\nRelationships:\n${relLines.join('\n')}`

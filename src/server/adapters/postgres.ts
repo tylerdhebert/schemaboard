@@ -1,5 +1,5 @@
 import { Client } from 'pg'
-import { buildSchemaData } from './shared'
+import { buildSchemaData, filterColumns } from './shared'
 import type { DbAdapter } from './types'
 
 // Excludes system schemas; aliases match RawColumn/RawPK/RawFK field names expected by buildSchemaData.
@@ -101,13 +101,7 @@ export const postgresAdapter: DbAdapter = {
         client.query(PKS_QUERY),
         client.query(FKS_QUERY),
       ])
-      const excluded = new Set(excludedSchemas ?? [])
-      const included = includedTables?.length ? new Set(includedTables) : null
-      const cols = colResult.rows.filter((r: { schema: string; tableName: string }) => {
-        if (excluded.size && excluded.has(r.schema)) return false
-        if (included && !included.has(`${r.schema}.${r.tableName}`)) return false
-        return true
-      })
+      const cols = filterColumns(colResult.rows, excludedSchemas, includedTables)
       return buildSchemaData(cols, pkResult.rows, fkResult.rows)
     } finally {
       await client.end()

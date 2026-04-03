@@ -36,6 +36,7 @@ export function ConnectionModal({ connections, onClose }: ConnectionModalProps) 
   const [availableTables, setAvailableTables] = useState<string[] | null>(null)
   const [tablePickerOpen, setTablePickerOpen] = useState(false)
   const [loadingTables, setLoadingTables] = useState(false)
+  const [hideAllInitially, setHideAllInitially] = useState(false)
   const qc = useQueryClient()
 
   const resetForm = () => {
@@ -50,6 +51,7 @@ export function ConnectionModal({ connections, onClose }: ConnectionModalProps) 
     setChipInput('')
     setIncludedTables([])
     setAvailableTables(null)
+    setHideAllInitially(false)
   }
 
   const startEdit = (conn: Connection) => {
@@ -64,6 +66,7 @@ export function ConnectionModal({ connections, onClose }: ConnectionModalProps) 
     setTestError('')
     setChipInput('')
     setAvailableTables(null)
+    setHideAllInitially(conn.hideAllInitially ?? false)
   }
 
   const saveMutation = useMutation({
@@ -85,6 +88,7 @@ export function ConnectionModal({ connections, onClose }: ConnectionModalProps) 
         type: dbType,
         excludedSchemas,
         includedTables: includedTables.length ? includedTables : undefined,
+        hideAllInitially: hideAllInitially || undefined,
       }
 
       if (editingName !== null) {
@@ -399,6 +403,19 @@ export function ConnectionModal({ connections, onClose }: ConnectionModalProps) 
               </div>
             )}
           </div>
+
+          {/* Hide all initially */}
+          <label style={{ display: 'flex', alignItems: 'center', gap: 9, cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={hideAllInitially}
+              onChange={e => setHideAllInitially(e.target.checked)}
+              style={{ cursor: 'pointer', width: 14, height: 14 }}
+            />
+            <span style={{ fontSize: 13, color: 'var(--text-2)', fontWeight: 500 }}>
+              Hide all tables on load
+            </span>
+          </label>
 
           {testResult === 'error' && testError && (
             <div style={{ fontSize: 12, color: 'var(--err-color)', padding: '6px 10px', background: 'var(--err-bg)', borderRadius: 6 }}>

@@ -172,6 +172,23 @@ export function Sidebar({ schemaData, groups, onSelectGroup, onAddGroup }: Sideb
     return map
   }, [groups])
 
+  const fkNeighbors = useMemo(() => {
+    const tableByName = new Map(schemaData.tables.map(t => [t.name, t]))
+    const map = new Map<string, string[]>()
+    for (const fk of schemaData.foreignKeys) {
+      const p = tableByName.get(fk.parentTable)
+      const r = tableByName.get(fk.referencedTable)
+      if (!p || !r) continue
+      const pId = `${p.schema}.${p.name}`
+      const rId = `${r.schema}.${r.name}`
+      if (!map.has(pId)) map.set(pId, [])
+      if (!map.has(rId)) map.set(rId, [])
+      map.get(pId)!.push(rId)
+      map.get(rId)!.push(pId)
+    }
+    return map
+  }, [schemaData.tables, schemaData.foreignKeys])
+
   const allTableIds = useMemo(
     () => schemaData.tables.map(t => `${t.schema}.${t.name}`),
     [schemaData.tables]
@@ -234,17 +251,7 @@ export function Sidebar({ schemaData, groups, onSelectGroup, onAddGroup }: Sideb
     const wasSelected = selectedTables.has(nodeId)
     toggleTable(nodeId)
     if (!wasSelected && autoExpand) {
-      const tableByName = new Map(schemaData.tables.map(t => [t.name, t]))
-      const neighbors: string[] = []
-      for (const fk of schemaData.foreignKeys) {
-        const p = tableByName.get(fk.parentTable)
-        const r = tableByName.get(fk.referencedTable)
-        if (!p || !r) continue
-        const pId = `${p.schema}.${p.name}`
-        const rId = `${r.schema}.${r.name}`
-        if (pId === nodeId) neighbors.push(rId)
-        else if (rId === nodeId) neighbors.push(pId)
-      }
+      const neighbors = fkNeighbors.get(nodeId) ?? []
       if (neighbors.length) selectTables([nodeId, ...neighbors])
     }
   }

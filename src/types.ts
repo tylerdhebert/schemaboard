@@ -40,6 +40,7 @@ export interface Connection {
   type: DbType
   excludedSchemas?: string[]
   includedTables?: string[]   // qualified "schema.table"; empty/absent = all tables
+  hideAllInitially?: boolean
 }
 
 export interface Group {

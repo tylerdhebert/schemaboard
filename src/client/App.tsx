@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from './api/client'
 import { useStore } from './store'
@@ -7,12 +7,12 @@ import { Sidebar } from './components/Sidebar'
 import { Canvas } from './components/Canvas'
 import { ContextPanel } from './components/ContextPanel'
 import { GroupModal } from './components/GroupModal'
-import type { Group, SchemaData } from '../types'
+import type { Connection, Group, SchemaData } from '../types'
 
 const EMPTY_SCHEMA: SchemaData = { tables: [], foreignKeys: [] }
 
 export function App() {
-  const { activeConnection, selectedTables, clearSelection, selectTables, toggleTableVisibility } = useStore()
+  const { activeConnection, selectedTables, clearSelection, selectTables, deselectTables, toggleTableVisibility, setHiddenTables } = useStore()
   const [showGroupModal, setShowGroupModal] = useState(false)
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; tableId: string } | null>(null)
   const qc = useQueryClient()
@@ -50,6 +50,19 @@ export function App() {
     }
   })
 
+  // Apply hideAllInitially when schema first loads for each connection switch.
+  // Use a ref so refreshes don't re-hide tables the user has already shown.
+  const lastHideConnectionRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!activeConnection || !schemaData.tables.length) return
+    if (lastHideConnectionRef.current === activeConnection) return
+    lastHideConnectionRef.current = activeConnection
+    const conn = (connections as Connection[]).find(c => c.name === activeConnection)
+    if (conn?.hideAllInitially) {
+      setHiddenTables(schemaData.tables.map(t => `${t.schema}.${t.name}`))
+    }
+  }, [activeConnection, schemaData, connections, setHiddenTables])
+
   const assignGroupMutation = useMutation({
     mutationFn: async ({ groupId, tableName }: { groupId: string; tableName: string }) => {
       const group = (groups as Group[]).find(g => g.id === groupId)
@@ -70,8 +83,13 @@ export function App() {
       .map(name => schemaData.tables.find(t => t.name === name))
       .filter((t): t is NonNullable<typeof t> => t != null)
       .map(t => `${t.schema}.${t.name}`)
-    selectTables(ids)
-  }, [groups, schemaData.tables, selectTables])
+    const allSelected = ids.length > 0 && ids.every(id => selectedTables.has(id))
+    if (allSelected) {
+      deselectTables(ids)
+    } else {
+      selectTables(ids)
+    }
+  }, [groups, schemaData.tables, selectedTables, selectTables, deselectTables])
 
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     const target = (e.target as HTMLElement).closest('[data-table-id]') as HTMLElement | null

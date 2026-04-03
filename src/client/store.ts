@@ -17,6 +17,7 @@ interface AppState {
   setActiveConnection: (name: string) => void
   toggleTable: (id: string) => void
   selectTables: (ids: string[]) => void
+  deselectTables: (ids: string[]) => void
   clearSelection: () => void
   toggleGroupVisibility: (groupId: string) => void
   toggleTableVisibility: (id: string) => void
@@ -56,6 +57,12 @@ export const useStore = create<AppState>((set) => ({
   selectTables: (ids) => set((s) => {
     const next = new Set(s.selectedTables)
     ids.forEach(id => next.add(id))
+    return { selectedTables: next }
+  }),
+
+  deselectTables: (ids) => set((s) => {
+    const next = new Set(s.selectedTables)
+    ids.forEach(id => next.delete(id))
     return { selectedTables: next }
   }),
 

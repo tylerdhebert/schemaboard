@@ -21,6 +21,21 @@ export type RawFK = {
   referencedColumn: string
 }
 
+export function filterColumns<T extends { schema: string; tableName: string }>(
+  rows: T[],
+  excludedSchemas: string[] | undefined,
+  includedTables: string[] | undefined,
+): T[] {
+  const excluded = excludedSchemas?.length ? new Set(excludedSchemas) : null
+  const included = includedTables?.length ? new Set(includedTables) : null
+  if (!excluded && !included) return rows
+  return rows.filter(r => {
+    if (excluded?.has(r.schema)) return false
+    if (included && !included.has(`${r.schema}.${r.tableName}`)) return false
+    return true
+  })
+}
+
 export function buildSchemaData(
   rawColumns: RawColumn[],
   rawPKs: RawPK[],

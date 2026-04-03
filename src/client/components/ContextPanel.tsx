@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect, useRef } from 'react'
 import { useStore } from '../store'
 import { generateCondensed, generateDDL } from '../lib/context-generator'
 import { estimateTokens } from '../lib/token-estimate'
@@ -31,6 +31,16 @@ export function ContextPanel({ schemaData }: ContextPanelProps) {
       ? generateCondensed(selectedTableData, relevantFKs)
       : generateDDL(selectedTableData, relevantFKs)
   }, [selectedTableData, relevantFKs, format])
+
+  const isEditingRef = useRef(isEditing)
+  useEffect(() => { isEditingRef.current = isEditing }, [isEditing])
+
+  useEffect(() => {
+    setSavedText(null)
+    if (isEditingRef.current) {
+      setEditedText(contextText)
+    }
+  }, [contextText])
 
   const displayText = isEditing ? editedText : (savedText ?? contextText)
   const tokenCount = useMemo(() => estimateTokens(displayText), [displayText])

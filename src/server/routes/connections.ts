@@ -31,6 +31,7 @@ export const connectionsRouter = new Elysia({ prefix: '/api/connections' })
       type: DbTypeSchema,
       excludedSchemas: t.Optional(t.Array(t.String())),
       includedTables: t.Optional(t.Array(t.String())),
+      hideAllInitially: t.Optional(t.Boolean()),
     })
   })
 
@@ -90,6 +91,7 @@ export const connectionsRouter = new Elysia({ prefix: '/api/connections' })
       type: DbTypeSchema,
       excludedSchemas: t.Optional(t.Array(t.String())),
       includedTables: t.Optional(t.Array(t.String())),
+      hideAllInitially: t.Optional(t.Boolean()),
     })
   })
 
