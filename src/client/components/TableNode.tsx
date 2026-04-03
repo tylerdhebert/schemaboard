@@ -8,6 +8,7 @@ interface TableNodeData {
   selected: boolean
   dim: boolean
   matched?: boolean
+  compact?: boolean
 }
 
 interface TableNodeProps {
@@ -16,7 +17,7 @@ interface TableNodeProps {
 }
 
 export const TableNode = memo(function TableNode({ id, data }: TableNodeProps) {
-  const { table, group, selected, dim, matched } = data
+  const { table, group, selected, dim, matched, compact } = data
   const groupColor = group?.color ?? 'var(--text-3)'
 
   return (
@@ -67,7 +68,7 @@ export const TableNode = memo(function TableNode({ id, data }: TableNodeProps) {
       </div>
 
       {/* Columns */}
-      <div style={{ padding: '5px 0 3px' }}>
+      {!compact && <div style={{ padding: '5px 0 3px' }}>
         {table.columns.map(col => (
           <div key={col.name} style={{
             display: 'flex', alignItems: 'center', gap: 6,
@@ -105,7 +106,7 @@ export const TableNode = memo(function TableNode({ id, data }: TableNodeProps) {
             </span>
           </div>
         ))}
-      </div>
+      </div>}
     </div>
   )
 })

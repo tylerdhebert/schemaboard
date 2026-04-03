@@ -14,6 +14,7 @@ interface AppState {
   layoutKey: number
   layoutType: LayoutType
   searchQuery: string
+  compactNodes: boolean
   setActiveConnection: (name: string) => void
   toggleTable: (id: string) => void
   selectTables: (ids: string[]) => void
@@ -30,6 +31,7 @@ interface AppState {
   resetLayout: () => void
   setLayoutType: (t: LayoutType) => void
   setSearchQuery: (q: string) => void
+  toggleCompactNodes: () => void
 }
 
 export const useStore = create<AppState>((set) => ({
@@ -45,6 +47,7 @@ export const useStore = create<AppState>((set) => ({
   layoutKey: 0,
   layoutType: 'dagre',
   searchQuery: '',
+  compactNodes: false,
 
   setActiveConnection: (name) => set({ activeConnection: name, selectedTables: new Set(), hiddenTables: new Set() }),
 
@@ -90,4 +93,5 @@ export const useStore = create<AppState>((set) => ({
   resetLayout: () => set((s) => ({ layoutKey: s.layoutKey + 1 })),
   setLayoutType: (layoutType) => set({ layoutType }),
   setSearchQuery: (searchQuery) => set({ searchQuery }),
+  toggleCompactNodes: () => set((s) => ({ compactNodes: !s.compactNodes })),
 }))

@@ -1,7 +1,8 @@
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from './api/client'
 import { useStore } from './store'
+import { traceFkChain } from './lib/fk-chain'
 import { Header } from './components/Header'
 import { Sidebar } from './components/Sidebar'
 import { Canvas } from './components/Canvas'
@@ -49,6 +50,23 @@ export function App() {
       return (res.data as SchemaData) ?? EMPTY_SCHEMA
     }
   })
+
+  const fkNeighbors = useMemo(() => {
+    const tableByName = new Map(schemaData.tables.map(t => [t.name, t]))
+    const map = new Map<string, string[]>()
+    for (const fk of schemaData.foreignKeys) {
+      const p = tableByName.get(fk.parentTable)
+      const r = tableByName.get(fk.referencedTable)
+      if (!p || !r) continue
+      const pId = `${p.schema}.${p.name}`
+      const rId = `${r.schema}.${r.name}`
+      if (!map.has(pId)) map.set(pId, [])
+      if (!map.has(rId)) map.set(rId, [])
+      map.get(pId)!.push(rId)
+      map.get(rId)!.push(pId)
+    }
+    return map
+  }, [schemaData.tables, schemaData.foreignKeys])
 
   // Apply hideAllInitially when schema first loads for each connection switch.
   // Use a ref so refreshes don't re-hide tables the user has already shown.
@@ -183,7 +201,16 @@ export function App() {
               }}
               onClick={e => e.stopPropagation()}
             >
-              <div style={{ padding: '4px 12px 3px', fontSize: 10, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.8px', borderBottom: '1px solid var(--border)' }}>
+              <div
+                onClick={() => {
+                  selectTables(traceFkChain(ctxMenu.tableId, fkNeighbors))
+                  setCtxMenu(null)
+                }}
+                style={{ padding: '8px 12px', fontSize: 13, cursor: 'pointer', color: 'var(--text-1)', fontWeight: 500 }}
+              >
+                Trace FK chain
+              </div>
+              <div style={{ padding: '4px 12px 3px', fontSize: 10, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.8px', borderBottom: '1px solid var(--border)', borderTop: '1px solid var(--border)' }}>
                 Assign to group
               </div>
               {(groups as Group[]).length === 0 && (

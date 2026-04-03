@@ -4,6 +4,7 @@ const EDGE_ACTIVE_STROKE = 'rgba(74,123,245,0.5)'
 const EDGE_DIM_STROKE = 'rgba(255,255,255,0.06)'
 import {
   ReactFlow,
+  MiniMap,
   useNodesState,
   useEdgesState,
   useReactFlow,
@@ -63,7 +64,7 @@ interface CanvasProps {
 }
 
 export function Canvas({ schemaData, groups }: CanvasProps) {
-  const { selectedTables, hiddenGroups, hiddenTables, autoExpand, layoutKey, layoutType, searchQuery, toggleTable, selectTables, triggerFitView } = useStore()
+  const { selectedTables, hiddenGroups, hiddenTables, autoExpand, layoutKey, layoutType, searchQuery, compactNodes, toggleTable, selectTables, triggerFitView } = useStore()
 
   const tableToGroup = useMemo(() => {
     const map = new Map<string, Group>()
@@ -150,7 +151,7 @@ export function Canvas({ schemaData, groups }: CanvasProps) {
         return {
           ...node,
           position: posMap?.get(node.id) ?? node.position,
-          data: { table: tableData, group, selected, dim, matched },
+          data: { table: tableData, group, selected, dim, matched, compact: compactNodes },
         }
       })
     })
@@ -171,7 +172,7 @@ export function Canvas({ schemaData, groups }: CanvasProps) {
         animated: false,
       }
     }))
-  }, [baseLayout, selectedTables, tableToGroup, searchQuery, setRfNodes, setRfEdges])
+  }, [baseLayout, selectedTables, tableToGroup, searchQuery, compactNodes, setRfNodes, setRfEdges])
 
   // ── Node click ────────────────────────────────────────────────────────────
 
@@ -206,6 +207,15 @@ export function Canvas({ schemaData, groups }: CanvasProps) {
         proOptions={{ hideAttribution: true }}
       >
         <ZoomController />
+        <MiniMap
+          nodeColor={n => (n.data as { selected?: boolean }).selected ? '#4a7bf5' : 'rgba(255,255,255,0.12)'}
+          maskColor="rgba(0,0,0,0.45)"
+          style={{
+            background: 'var(--surface)',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--r-sm)',
+          }}
+        />
       </ReactFlow>
     </div>
   )

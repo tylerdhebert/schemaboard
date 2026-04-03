@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { useStore } from '../store'
 import { TablePicker } from './TablePicker'
+import { traceFkChain } from '../lib/fk-chain'
 import type { SchemaData, Group, SchemaTable, LayoutType } from '../../types'
 
 interface SidebarProps {
@@ -146,9 +147,9 @@ export function Sidebar({ schemaData, groups, onSelectGroup, onAddGroup }: Sideb
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const {
-    selectedTables, hiddenGroups, hiddenTables, autoExpand,
+    selectedTables, hiddenGroups, hiddenTables, autoExpand, compactNodes,
     toggleTable, selectTables, toggleGroupVisibility, toggleTableVisibility,
-    setZoomToTable, resetLayout, setHiddenTables, setSearchQuery, setFitToNodes,
+    setZoomToTable, resetLayout, setHiddenTables, setSearchQuery, setFitToNodes, toggleCompactNodes,
   } = useStore()
 
   const handleSearch = (value: string) => {
@@ -330,6 +331,7 @@ export function Sidebar({ schemaData, groups, onSelectGroup, onAddGroup }: Sideb
         <IconBtn icon="↺" label="Recalc layout" onClick={resetLayout} />
         <IconBtn icon="⊡" label="Choose visible" onClick={() => setShowTablePicker(true)} />
         <IconBtn icon={allExpanded ? '⊟' : '⊕'} label={allExpanded ? 'Collapse all' : 'Expand all'} onClick={toggleExpandAll} active={allExpanded} />
+        <IconBtn icon="≡" label={compactNodes ? 'Show columns' : 'Headers only'} onClick={toggleCompactNodes} active={compactNodes} />
         <LayoutDropdown />
         <div style={{ flex: 1 }} />
         <IconBtn icon="⬡" label="New group" onClick={onAddGroup} />
@@ -370,6 +372,15 @@ export function Sidebar({ schemaData, groups, onSelectGroup, onAddGroup }: Sideb
               style={{ padding: '8px 14px', fontSize: 13, cursor: 'pointer', color: 'var(--text-1)', fontWeight: 500 }}
             >
               Zoom to
+            </div>
+            <div
+              onClick={() => {
+                selectTables(traceFkChain(ctxMenu.nodeId, fkNeighbors))
+                setCtxMenu(null)
+              }}
+              style={{ padding: '8px 14px', fontSize: 13, cursor: 'pointer', color: 'var(--text-1)', fontWeight: 500, borderTop: '1px solid var(--border)' }}
+            >
+              Trace FK chain
             </div>
             <div
               onClick={() => { toggleTableVisibility(ctxMenu.nodeId); setCtxMenu(null) }}
@@ -422,6 +433,10 @@ export function Sidebar({ schemaData, groups, onSelectGroup, onAddGroup }: Sideb
             .map(name => schemaData.tables.find(t => t.name === name))
             .filter((t): t is SchemaTable => t != null)
 
+          const totalCount = group.tables.length
+          const selectedCount = displayTables.filter(t => selectedTables.has(`${t.schema}.${t.name}`)).length
+          const allGroupSelected = selectedCount === totalCount && totalCount > 0
+
           return (
             <div key={group.id} style={{ marginBottom: 2 }}>
               <div
@@ -453,8 +468,11 @@ export function Sidebar({ schemaData, groups, onSelectGroup, onAddGroup }: Sideb
                 >
                   {group.name}
                 </span>
-                <span style={{ fontSize: 10, color: 'var(--text-3)', fontWeight: 600 }}>
-                  {group.tables.length}
+                <span style={{
+                  fontSize: 10, fontWeight: 600,
+                  color: allGroupSelected ? 'var(--accent)' : selectedCount > 0 ? 'var(--text-2)' : 'var(--text-3)',
+                }}>
+                  {selectedCount > 0 ? `${selectedCount}/` : ''}{totalCount}
                 </span>
                 <button
                   onClick={() => toggleGroupVisibility(group.id)}
