@@ -15,5 +15,8 @@ export default defineConfig({
         changeOrigin: true
       }
     }
-  }
+  },
+  optimizeDeps: {
+    include: ['d3-force', 'elkjs/lib/elk.bundled.js'],
+  },
 })

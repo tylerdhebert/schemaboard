@@ -3,7 +3,7 @@ import {
   forceSimulation, forceLink, forceManyBody, forceCenter, forceCollide,
   type SimulationNodeDatum, type SimulationLinkDatum,
 } from 'd3-force'
-import ELK from 'elkjs'
+import ELK from 'elkjs/lib/elk.bundled.js'
 import type { Node, Edge } from '@xyflow/react'
 import type { SchemaTable, ForeignKey, LayoutType } from '../../types'
 
