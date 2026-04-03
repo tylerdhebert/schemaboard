@@ -18,7 +18,7 @@ describe('config', () => {
 
   test('writeConfig persists and readConfig retrieves', () => {
     const data = {
-      connections: [{ name: 'Test', connectionString: 'Server=test' }],
+      connections: [{ name: 'Test', connectionString: 'Server=test', type: 'sqlserver' as const }],
       groups: [{ id: 'g1', name: 'Orders', color: '#3B82F6', tables: ['Orders'] }]
     }
     writeConfig(data)

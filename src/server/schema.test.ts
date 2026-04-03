@@ -4,8 +4,8 @@ import { buildSchemaData } from './adapters/shared'
 describe('buildSchemaData', () => {
   test('merges raw rows into structured SchemaData', () => {
     const rawColumns = [
-      { schema: 'dbo', tableName: 'Orders', columnName: 'Id', dataType: 'int', maxLength: null, numericPrecision: 10, numericScale: 0, isNullable: 'NO', defaultValue: null },
-      { schema: 'dbo', tableName: 'Orders', columnName: 'CustomerId', dataType: 'int', maxLength: null, numericPrecision: 10, numericScale: 0, isNullable: 'NO', defaultValue: null },
+      { schema: 'dbo', tableName: 'Orders', columnName: 'Id', dataType: 'int', maxLength: null, numericPrecision: 10, numericScale: 0, isNullable: 'NO' as const, defaultValue: null },
+      { schema: 'dbo', tableName: 'Orders', columnName: 'CustomerId', dataType: 'int', maxLength: null, numericPrecision: 10, numericScale: 0, isNullable: 'NO' as const, defaultValue: null },
     ]
     const rawPKs = [{ schema: 'dbo', tableName: 'Orders', columnName: 'Id' }]
     const rawFKs = [{
