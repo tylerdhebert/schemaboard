@@ -34,6 +34,18 @@ export function ConnectionModal({ connections, onClose }: ConnectionModalProps) 
 
   const addMutation = useMutation({
     mutationFn: async () => {
+      // Test before saving
+      const testRes = await api.api.connections.test.post({ connectionString: connStr, type: dbType })
+      const testData = testRes.data as { ok: boolean; schemas?: string[]; error?: string } | null
+      if (testRes.error || !testData?.ok) {
+        const msg = testData?.error ?? 'Connection failed'
+        setTestResult('error')
+        setTestError(msg)
+        throw new Error(msg)
+      }
+      setTestResult('ok')
+      setAvailableSchemas(testData.schemas ?? [])
+
       const res = await api.api.connections.post({
         name,
         connectionString: connStr,
@@ -303,7 +315,7 @@ export function ConnectionModal({ connections, onClose }: ConnectionModalProps) 
                 fontFamily: 'inherit', fontSize: 13, fontWeight: 700,
               }}
             >
-              {addMutation.isPending ? 'Adding…' : 'Add Connection'}
+              {addMutation.isPending ? (testResult === 'ok' ? 'Adding…' : 'Testing…') : 'Add Connection'}
             </button>
           </div>
         </div>
