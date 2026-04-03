@@ -180,7 +180,7 @@ export function ContextPanel({ schemaData }: ContextPanelProps) {
               boxSizing: 'border-box',
             }}
           />
-        ) : contextText ? (
+        ) : displayText ? (
           <div style={{ flex: 1, overflowY: 'auto' }}>
             <pre style={{
               fontFamily: 'ui-monospace, Cascadia Code, monospace',
@@ -188,7 +188,7 @@ export function ContextPanel({ schemaData }: ContextPanelProps) {
               whiteSpace: 'pre-wrap', wordBreak: 'break-word',
               margin: 0,
             }}>
-              {contextText}
+              {displayText}
             </pre>
           </div>
         ) : (
