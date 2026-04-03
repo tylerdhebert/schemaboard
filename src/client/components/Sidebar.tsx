@@ -12,34 +12,45 @@ interface SidebarProps {
 
 function IconBtn({ icon, label, onClick, active }: { icon: string; label: string; onClick: () => void; active?: boolean }) {
   const [hovered, setHovered] = useState(false)
+  const [tipPos, setTipPos] = useState({ x: 0, y: 0 })
+
   return (
-    <button
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      onClick={onClick}
-      title={label}
-      style={{
-        display: 'inline-flex', alignItems: 'center',
-        padding: '5px 7px', borderRadius: 'var(--r-sm)',
-        border: `1px solid ${active ? 'var(--accent)' : 'var(--border-strong)'}`,
-        background: active ? 'var(--accent-light)' : 'none',
-        cursor: 'pointer', fontFamily: 'inherit', fontSize: 14,
-        color: active ? 'var(--accent)' : 'var(--text-3)',
-        overflow: 'hidden', flexShrink: 0,
-        transition: 'background 0.15s, border-color 0.15s',
-      }}
-    >
-      <span style={{ lineHeight: 1 }}>{icon}</span>
-      <span style={{
-        maxWidth: hovered ? 120 : 0,
-        overflow: 'hidden', whiteSpace: 'nowrap',
-        transition: 'max-width 0.18s ease, padding-left 0.18s ease',
-        paddingLeft: hovered ? 5 : 0,
-        fontSize: 11, fontWeight: 600,
+    <>
+      <button
+        onMouseEnter={e => {
+          const r = (e.currentTarget as HTMLButtonElement).getBoundingClientRect()
+          setTipPos({ x: r.left + r.width / 2, y: r.bottom + 6 })
+          setHovered(true)
+        }}
+        onMouseLeave={() => setHovered(false)}
+        onClick={onClick}
+        style={{
+          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+          padding: '5px 7px', borderRadius: 'var(--r-sm)',
+          border: `1px solid ${active ? 'var(--accent)' : 'var(--border-strong)'}`,
+          background: active ? 'var(--accent-light)' : hovered ? 'rgba(255,255,255,0.05)' : 'none',
+          cursor: 'pointer', fontFamily: 'inherit', fontSize: 14,
+          color: active ? 'var(--accent)' : 'var(--text-3)',
+          flexShrink: 0,
+          transition: 'background 0.1s, border-color 0.1s',
+        }}
+      >
+        <span style={{ lineHeight: 1 }}>{icon}</span>
+      </button>
+      <div style={{
+        position: 'fixed', left: tipPos.x, top: tipPos.y,
+        transform: 'translateX(-50%)',
+        opacity: hovered ? 1 : 0,
+        transition: 'opacity 0.12s ease',
+        pointerEvents: 'none', zIndex: 400,
+        background: 'var(--surface)', border: '1px solid var(--border)',
+        borderRadius: 'var(--r-sm)', padding: '3px 8px',
+        fontSize: 11, fontWeight: 600, color: 'var(--text-2)',
+        whiteSpace: 'nowrap', boxShadow: 'var(--shadow-md)',
       }}>
         {label}
-      </span>
-    </button>
+      </div>
+    </>
   )
 }
 
