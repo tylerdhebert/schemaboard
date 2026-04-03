@@ -13,6 +13,7 @@ export function ContextPanel({ schemaData }: ContextPanelProps) {
   const [copied, setCopied] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [editedText, setEditedText] = useState('')
+  const [savedText, setSavedText] = useState<string | null>(null)
 
   const selectedTableData = useMemo(() =>
     schemaData.tables.filter(t => selectedTables.has(`${t.schema}.${t.name}`)),
@@ -31,14 +32,18 @@ export function ContextPanel({ schemaData }: ContextPanelProps) {
       : generateDDL(selectedTableData, relevantFKs)
   }, [selectedTableData, relevantFKs, format])
 
-  const displayText = isEditing ? editedText : contextText
+  const displayText = isEditing ? editedText : (savedText ?? contextText)
   const tokenCount = useMemo(() => estimateTokens(displayText), [displayText])
+  const hasCustomEdits = savedText !== null
 
   const handleToggleEdit = () => {
-    if (!isEditing) {
-      setEditedText(contextText)
+    if (isEditing) {
+      setSavedText(editedText)
+      setIsEditing(false)
+    } else {
+      setEditedText(savedText ?? contextText)
+      setIsEditing(true)
     }
-    setIsEditing(v => !v)
   }
 
   const handleCopy = async () => {
@@ -126,21 +131,36 @@ export function ContextPanel({ schemaData }: ContextPanelProps) {
         <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.8px', textTransform: 'uppercase', color: 'var(--text-3)' }}>
           {isEditing ? 'Editing' : 'Preview'}
         </span>
-        <button
-          onClick={handleToggleEdit}
-          disabled={!contextText && !isEditing}
-          style={{
-            fontSize: 11, fontWeight: 600, padding: '3px 9px',
-            borderRadius: 5, border: '1px solid var(--border-strong)',
-            background: isEditing ? 'var(--accent)' : 'transparent',
-            color: isEditing ? 'white' : 'var(--text-3)',
-            cursor: contextText || isEditing ? 'pointer' : 'not-allowed',
-            fontFamily: 'inherit',
-            opacity: !contextText && !isEditing ? 0.4 : 1,
-          }}
-        >
-          {isEditing ? 'Done' : 'Edit'}
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+          {hasCustomEdits && !isEditing && (
+            <button
+              onClick={() => setSavedText(null)}
+              style={{
+                fontSize: 11, fontWeight: 600, padding: '3px 9px',
+                borderRadius: 5, border: '1px solid var(--border-strong)',
+                background: 'transparent', color: 'var(--text-3)',
+                cursor: 'pointer', fontFamily: 'inherit',
+              }}
+            >
+              Reset
+            </button>
+          )}
+          <button
+            onClick={handleToggleEdit}
+            disabled={!contextText && !isEditing}
+            style={{
+              fontSize: 11, fontWeight: 600, padding: '3px 9px',
+              borderRadius: 5, border: '1px solid var(--border-strong)',
+              background: isEditing ? 'var(--accent)' : 'transparent',
+              color: isEditing ? 'white' : 'var(--text-3)',
+              cursor: contextText || isEditing ? 'pointer' : 'not-allowed',
+              fontFamily: 'inherit',
+              opacity: !contextText && !isEditing ? 0.4 : 1,
+            }}
+          >
+            {isEditing ? 'Done' : 'Edit'}
+          </button>
+        </div>
       </div>
 
       {/* Preview / Edit area */}
