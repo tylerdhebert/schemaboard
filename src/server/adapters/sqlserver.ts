@@ -98,6 +98,23 @@ function errMsg(err: unknown): string {
 
 // Returns an mssql ConnectionPool, using msnodesqlv8 (ODBC/SSPI) for Windows auth
 // and tedious for standard SQL auth.
+// Test the ODBC connection directly via msnodesqlv8 to get raw error details
+async function testOdbcDirect(odbcStr: string): Promise<void> {
+  const msnodesql = (await import('msnodesqlv8')).default as {
+    open: (connStr: string, cb: (err: unknown, conn: unknown) => void) => void
+  }
+  return new Promise((resolve, reject) => {
+    msnodesql.open(odbcStr, (err, conn) => {
+      if (err) {
+        console.error('[sqlserver] raw ODBC error:', JSON.stringify(err, Object.getOwnPropertyNames(err as object)))
+        reject(err)
+      } else {
+        resolve()
+      }
+    })
+  })
+}
+
 async function connect(connectionString: string): Promise<sql.ConnectionPool> {
   const parts = parseConnStr(connectionString)
   if (isWindowsAuth(parts)) {
@@ -117,7 +134,14 @@ export const sqlServerAdapter: DbAdapter = {
       const pool = await connect(connectionString)
       await pool.close()
     } catch (err) {
-      console.error('[sqlserver] testConnection error:', err)
+      console.error('[sqlserver] testConnection error:', JSON.stringify(err, Object.getOwnPropertyNames(err as object)))
+      // If Windows auth, also try direct ODBC to surface the real error
+      const parts = parseConnStr(connectionString)
+      if (isWindowsAuth(parts)) {
+        await testOdbcDirect(buildOdbcConnStr(parts)).catch(e =>
+          console.error('[sqlserver] direct ODBC error:', JSON.stringify(e, Object.getOwnPropertyNames(e as object)))
+        )
+      }
       throw new Error(`Connection failed: ${errMsg(err)}`)
     }
   },
