@@ -468,6 +468,38 @@
   background: rgba(255, 255, 255, 0.02);
 }
 
+.dragHandle {
+  width: 18px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-3);
+  cursor: grab;
+}
+
+.dragHandle:hover {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-2);
+}
+
+.dragHandleDisabled {
+  opacity: 0.38;
+  cursor: default;
+}
+
+.dropTargetBefore {
+  box-shadow: inset 0 2px 0 var(--accent);
+}
+
+.dropTargetAfter {
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
 .groupToggle {
   background: none;
   border: none;

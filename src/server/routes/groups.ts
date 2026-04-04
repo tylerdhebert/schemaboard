@@ -1,9 +1,22 @@
 import { Elysia, t } from 'elysia'
-import { createGroup, deleteGroup, listGroups, updateGroup, updateGroupMembership } from '../config'
+import { createGroup, deleteGroup, listGroups, reorderGroups, updateGroup, updateGroupMembership } from '../config'
 import { randomUUID } from 'crypto'
 
 export const groupsRouter = new Elysia({ prefix: '/api/groups' })
   .get('/', () => listGroups())
+
+  .post('/reorder', ({ body, set }) => {
+    const ok = reorderGroups(body.groupIds)
+    if (!ok) {
+      set.status = 400
+      return { error: 'Invalid group order' }
+    }
+    return { ok: true }
+  }, {
+    body: t.Object({
+      groupIds: t.Array(t.String())
+    })
+  })
 
   .post('/membership', ({ body, set }) => {
     const ok = updateGroupMembership(body.tableName, body.action, body.groupId)

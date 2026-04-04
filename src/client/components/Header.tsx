@@ -22,6 +22,7 @@ interface HeaderProps {
   canSaveWorkspace: boolean
   onRefresh: () => void
   onSaveWorkspace: () => void
+  onSaveAsWorkspace: () => void
   onOpenWorkspaces: () => void
   onOpenDiff: () => void
 }
@@ -66,6 +67,7 @@ export function Header({
   canSaveWorkspace,
   onRefresh,
   onSaveWorkspace,
+  onSaveAsWorkspace,
   onOpenWorkspaces,
   onOpenDiff,
 }: HeaderProps) {
@@ -171,6 +173,17 @@ export function Header({
                     Save changes
                   </button>
                 )}
+                <button
+                  type="button"
+                  className={styles.menuAction}
+                  onClick={() => {
+                    closeMenu()
+                    onSaveAsWorkspace()
+                  }}
+                >
+                  <FolderKanban size={14} strokeWidth={2.2} />
+                  Save as new workspace
+                </button>
                 <button
                   type="button"
                   className={styles.menuActionPrimary}

@@ -80,6 +80,8 @@ export function App() {
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; tableId: string } | null>(null)
   const [selectionMenu, setSelectionMenu] = useState<{ x: number; y: number } | null>(null)
   const [showWorkspaceModal, setShowWorkspaceModal] = useState(false)
+  const [workspaceModalIntent, setWorkspaceModalIntent] = useState<'create' | 'update'>('update')
+  const [workspaceModalDraftName, setWorkspaceModalDraftName] = useState('')
   const [showDiffModal, setShowDiffModal] = useState(false)
   const [copiedSelectionContext, setCopiedSelectionContext] = useState(false)
   const [leftSidebarWidth, setLeftSidebarWidth] = useState(() => {
@@ -172,6 +174,22 @@ export function App() {
           ? { tableName, action: 'remove', groupId }
           : { tableName, action: 'clear' }
       )
+      if (res.error) throw res.error
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['groups'] }),
+  })
+
+  const reorderGroupsMutation = useMutation({
+    mutationFn: async (groupIds: string[]) => {
+      const res = await api.api.groups.reorder.post({ groupIds })
+      if (res.error) throw res.error
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['groups'] }),
+  })
+
+  const reorderGroupTablesMutation = useMutation({
+    mutationFn: async ({ groupId, tableNames }: { groupId: string; tableNames: string[] }) => {
+      const res = await api.api.groups({ id: groupId }).put({ tables: tableNames })
       if (res.error) throw res.error
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['groups'] }),
@@ -274,9 +292,32 @@ export function App() {
     setCtxMenu(null)
   }, [unassignGroupMutation])
 
+  const handleReorderGroups = useCallback((groupIds: string[]) => {
+    reorderGroupsMutation.mutate(groupIds)
+  }, [reorderGroupsMutation])
+
+  const handleReorderGroupTables = useCallback((groupId: string, tableIds: string[]) => {
+    reorderGroupTablesMutation.mutate({
+      groupId,
+      tableNames: tableIds.map(tableNameFromId),
+    })
+  }, [reorderGroupTablesMutation])
+
   const handleLoadWorkspace = useCallback((workspace: Workspace) => {
     applyWorkspaceState(workspace.state, workspace.id)
   }, [applyWorkspaceState])
+
+  const openWorkspaceManager = useCallback(() => {
+    setWorkspaceModalIntent('update')
+    setWorkspaceModalDraftName(currentWorkspace?.name ?? '')
+    setShowWorkspaceModal(true)
+  }, [currentWorkspace])
+
+  const openSaveAsWorkspace = useCallback(() => {
+    setWorkspaceModalIntent('create')
+    setWorkspaceModalDraftName(currentWorkspace?.name ? `${currentWorkspace.name} copy` : '')
+    setShowWorkspaceModal(true)
+  }, [currentWorkspace])
 
   const ctxMenuTableName = ctxMenu ? tableNameFromId(ctxMenu.tableId) : null
   const ctxMenuGroups = ctxMenuTableName
@@ -391,7 +432,8 @@ export function App() {
         canSaveWorkspace={!!currentWorkspace && isWorkspaceDirty && !saveWorkspaceMutation.isPending}
         onRefresh={() => refetch()}
         onSaveWorkspace={() => saveWorkspaceMutation.mutate()}
-        onOpenWorkspaces={() => setShowWorkspaceModal(true)}
+        onSaveAsWorkspace={openSaveAsWorkspace}
+        onOpenWorkspaces={openWorkspaceManager}
         onOpenDiff={() => setShowDiffModal(true)}
       />
 
@@ -407,6 +449,8 @@ export function App() {
                 onAssignTableToGroup={handleAssignTableToGroup}
                 onAssignTablesToGroup={handleAssignTablesToGroup}
                 onUnassignTable={handleUnassignTable}
+                onReorderGroups={handleReorderGroups}
+                onReorderGroupTables={handleReorderGroupTables}
               />
             </div>
             <div
@@ -613,6 +657,8 @@ export function App() {
           activeConnection={effectiveConnection}
           workspaces={workspaces as Workspace[]}
           activeWorkspaceId={activeWorkspaceId}
+          defaultAction={workspaceModalIntent}
+          defaultDraftName={workspaceModalDraftName}
           onLoadWorkspace={handleLoadWorkspace}
           onClose={() => setShowWorkspaceModal(false)}
         />

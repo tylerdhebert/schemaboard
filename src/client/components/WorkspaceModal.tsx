@@ -9,6 +9,8 @@ interface WorkspaceModalProps {
   activeConnection: string
   workspaces: Workspace[]
   activeWorkspaceId: string | null
+  defaultDraftName?: string
+  defaultAction?: 'create' | 'update'
   onLoadWorkspace: (workspace: Workspace) => void
   onClose: () => void
 }
@@ -36,6 +38,8 @@ export function WorkspaceModal({
   activeConnection,
   workspaces,
   activeWorkspaceId,
+  defaultDraftName,
+  defaultAction = 'update',
   onLoadWorkspace,
   onClose,
 }: WorkspaceModalProps) {
@@ -61,8 +65,13 @@ export function WorkspaceModal({
   }
 
   useEffect(() => {
-    setName(activeWorkspace?.name ?? '')
-  }, [activeWorkspace])
+    if (defaultAction === 'create') {
+      setName(defaultDraftName ?? '')
+      return
+    }
+
+    setName(activeWorkspace?.name ?? defaultDraftName ?? '')
+  }, [activeWorkspace, defaultAction, defaultDraftName])
 
   const createMutation = useMutation({
     mutationFn: async () => {
@@ -200,7 +209,9 @@ export function WorkspaceModal({
         </div>
 
         <div className={styles.formSection}>
-          <div className={styles.sectionLabel}>Save current view</div>
+          <div className={styles.sectionLabel}>
+            {defaultAction === 'create' ? 'Save as new workspace' : 'Save current view'}
+          </div>
           {activeWorkspace && (
             <div className={styles.loadedWorkspace}>
               Loaded workspace: {activeWorkspace.name}

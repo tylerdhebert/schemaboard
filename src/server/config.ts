@@ -842,6 +842,35 @@ export function updateGroup(id: string, patch: Partial<Pick<Group, 'name' | 'col
   })
 }
 
+export function reorderGroups(groupIds: string[]): boolean {
+  return withDatabase(db => {
+    return runInTransaction(db, () => {
+      const uniqueIds = uniqueStrings(groupIds)
+      const existingIds = db
+        .query<{ id: string }, []>('SELECT id FROM groups ORDER BY sort_order, name')
+        .all()
+        .map(row => row.id)
+
+      if (uniqueIds.length !== existingIds.length) {
+        return false
+      }
+
+      const expected = [...existingIds].sort()
+      const received = [...uniqueIds].sort()
+      if (expected.some((id, index) => id !== received[index])) {
+        return false
+      }
+
+      const update = db.query('UPDATE groups SET sort_order = ? WHERE id = ?')
+      uniqueIds.forEach((groupId, index) => {
+        update.run(index, groupId)
+      })
+
+      return true
+    })
+  })
+}
+
 export function deleteGroup(id: string): boolean {
   return withDatabase(db => {
     const result = runInTransaction(db, () => db.query('DELETE FROM groups WHERE id = ?').run(id))
