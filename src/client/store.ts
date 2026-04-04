@@ -1,7 +1,10 @@
 import { create } from 'zustand'
 import type { ContextFormat, LayoutType, TablePosition, WorkspaceState } from '../types'
 
+type AppMode = 'live' | 'demo'
+
 interface AppState {
+  appMode: AppMode
   activeConnection: string | null
   activeWorkspaceId: string | null
   selectedTables: Set<string>
@@ -16,7 +19,8 @@ interface AppState {
   layoutType: LayoutType
   searchQuery: string
   compactNodes: boolean
-  setActiveConnection: (name: string) => void
+  setActiveConnection: (name: string | null) => void
+  setDemoMode: (enabled: boolean) => void
   setActiveWorkspaceId: (id: string | null) => void
   applyWorkspaceState: (state: WorkspaceState, workspaceId: string | null) => void
   captureWorkspaceState: () => WorkspaceState
@@ -38,7 +42,30 @@ interface AppState {
   setTablePosition: (id: string, position: TablePosition) => void
 }
 
+function sortObjectEntries<T>(value: Record<string, T>): Record<string, T> {
+  return Object.fromEntries(
+    Object.entries(value).sort(([left], [right]) => left.localeCompare(right))
+  )
+}
+
+export function normalizeWorkspaceState(state: WorkspaceState): WorkspaceState {
+  return {
+    selectedTables: [...state.selectedTables].sort(),
+    hiddenGroups: [...state.hiddenGroups].sort(),
+    hiddenTables: [...state.hiddenTables].sort(),
+    format: state.format,
+    layoutType: state.layoutType,
+    compactNodes: state.compactNodes,
+    tablePositions: sortObjectEntries(state.tablePositions),
+  }
+}
+
+export function workspaceStatesEqual(left: WorkspaceState, right: WorkspaceState): boolean {
+  return JSON.stringify(normalizeWorkspaceState(left)) === JSON.stringify(normalizeWorkspaceState(right))
+}
+
 export const useStore = create<AppState>((set, get) => ({
+  appMode: 'live',
   activeConnection: null,
   activeWorkspaceId: null,
   selectedTables: new Set(),
@@ -55,7 +82,22 @@ export const useStore = create<AppState>((set, get) => ({
   compactNodes: false,
 
   setActiveConnection: (name) => set((state) => ({
+    appMode: 'live',
     activeConnection: name,
+    activeWorkspaceId: null,
+    selectedTables: new Set(),
+    hiddenGroups: new Set(),
+    hiddenTables: new Set(),
+    tablePositions: {},
+    zoomToTable: null,
+    fitToNodes: null,
+    searchQuery: '',
+    fitViewKey: state.fitViewKey + 1,
+  })),
+
+  setDemoMode: (enabled) => set((state) => ({
+    appMode: enabled ? 'demo' : 'live',
+    activeConnection: enabled ? null : state.activeConnection,
     activeWorkspaceId: null,
     selectedTables: new Set(),
     hiddenGroups: new Set(),

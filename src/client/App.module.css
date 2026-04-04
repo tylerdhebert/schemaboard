@@ -1,0 +1,348 @@
+.app {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.main {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.leftPane,
+.rightPane {
+  flex-shrink: 0;
+  min-width: 0;
+  height: 100%;
+}
+
+.canvasArea {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+
+.resizeHandle {
+  width: 8px;
+  flex-shrink: 0;
+  position: relative;
+  cursor: col-resize;
+  background: transparent;
+}
+
+.resizeHandle::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 3px;
+  width: 2px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  transition: background 140ms ease;
+}
+
+.resizeHandle:hover::before {
+  background: rgba(74, 123, 245, 0.45);
+}
+
+.leftResizeHandle {
+  border-right: 1px solid transparent;
+}
+
+.rightResizeHandle {
+  border-left: 1px solid transparent;
+}
+
+.emptyState {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-3);
+  font-size: 14px;
+  background: var(--canvas);
+  background-image: radial-gradient(circle, rgba(255,255,255,0.07) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+
+.selectionBar {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: color-mix(in srgb, var(--surface) 90%, #0b1018 10%);
+  border: 1px solid color-mix(in srgb, var(--border) 78%, rgba(255, 255, 255, 0.08) 22%);
+  border-radius: 18px;
+  padding: 8px 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 18px 36px rgba(5, 10, 18, 0.28);
+  color: var(--text-2);
+  z-index: 10;
+  pointer-events: auto;
+  backdrop-filter: blur(18px);
+}
+
+.selectionSummary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-right: 6px;
+  min-width: 0;
+}
+
+.selectionCount {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: rgba(126, 169, 255, 0.12);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  color: var(--sel);
+}
+
+.selectionCopy {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.selectionLabel {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--text-1);
+}
+
+.selectionMeta {
+  font-size: 11px;
+  color: var(--text-3);
+}
+
+.selectionButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--text-2);
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 140ms ease, border-color 140ms ease, color 140ms ease;
+}
+
+.selectionButton:hover {
+  background: rgba(126, 169, 255, 0.08);
+  border-color: rgba(126, 169, 255, 0.22);
+  color: var(--text-1);
+}
+
+.selectionButtonPrimary {
+  background: rgba(126, 169, 255, 0.12);
+  border-color: rgba(126, 169, 255, 0.22);
+  color: var(--accent);
+}
+
+.selectionButtonPrimary:hover {
+  background: rgba(126, 169, 255, 0.16);
+}
+
+.selectionButtonMuted {
+  color: var(--text-3);
+}
+
+.menu {
+  position: fixed;
+  background: color-mix(in srgb, var(--surface) 90%, #0b1018 10%);
+  border: 1px solid color-mix(in srgb, var(--border) 78%, rgba(255, 255, 255, 0.08) 22%);
+  border-radius: 16px;
+  box-shadow: 0 24px 48px rgba(5, 10, 18, 0.42);
+  z-index: 50;
+  min-width: 260px;
+  overflow: hidden;
+  backdrop-filter: blur(18px);
+}
+
+.menuHeader {
+  padding: 11px 14px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.menuEyebrow {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.9px;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+
+.menuTitle {
+  margin-top: 4px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-1);
+  word-break: break-word;
+}
+
+.menuMeta {
+  margin-top: 3px;
+  font-size: 11px;
+  color: var(--text-3);
+}
+
+.menuDivider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.menuAction {
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 14px;
+  border: none;
+  background: transparent;
+  color: var(--text-1);
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+}
+
+.menuAction:hover,
+.menuGroupItem:hover {
+  background: rgba(126, 169, 255, 0.08);
+}
+
+.menuActionDanger:hover {
+  background: rgba(255, 122, 122, 0.08);
+}
+
+.menuActionIcon {
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-3);
+  margin-top: 1px;
+  flex-shrink: 0;
+}
+
+.menuActionDanger .menuActionIcon,
+.menuActionDanger .menuActionLabel {
+  color: #f1a2a2;
+}
+
+.menuActionBody {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.menuActionLabel {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.menuActionMeta {
+  font-size: 11px;
+  color: var(--text-3);
+}
+
+.menuSection {
+  padding: 9px 14px 7px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.menuSectionCount {
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: normal;
+}
+
+.menuEmpty {
+  padding: 0 14px 12px;
+  font-size: 11.5px;
+  color: var(--text-3);
+}
+
+.menuGroupItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 14px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-1);
+}
+
+.menuSwatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.menuGroupName {
+  flex: 1;
+  min-width: 0;
+}
+
+.menuGroupMeta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.menuGroupCount {
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-3);
+}
+
+.menuGroupBadge {
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: rgba(126, 169, 255, 0.12);
+  color: var(--accent);
+  flex-shrink: 0;
+}

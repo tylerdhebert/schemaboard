@@ -1,0 +1,215 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.modal {
+  background: var(--surface);
+  border-radius: var(--r);
+  border: 1px solid var(--border);
+  padding: 24px;
+  width: 520px;
+  box-shadow: var(--shadow-lg);
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.title {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--text-1);
+  letter-spacing: -0.4px;
+}
+
+.subtitle {
+  margin-top: 4px;
+  font-size: 12.5px;
+  color: var(--text-3);
+  line-height: 1.5;
+}
+
+.note {
+  font-size: 12.5px;
+  color: var(--accent);
+  margin-bottom: 14px;
+}
+
+.groupList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.emptyText {
+  font-size: 13px;
+  color: var(--text-3);
+  margin-bottom: 16px;
+}
+
+.groupRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--bg);
+}
+
+.groupRowActive {
+  border-color: rgba(74, 123, 245, 0.32);
+  background: rgba(74, 123, 245, 0.08);
+}
+
+.groupIdentity {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.groupMeta {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.groupName {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-1);
+}
+
+.groupCount {
+  font-size: 11.5px;
+  color: var(--text-3);
+}
+
+.groupActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.inlineButton {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+}
+
+.inlineButtonPrimary {
+  color: var(--accent);
+}
+
+.inlineButtonMuted {
+  color: var(--text-3);
+}
+
+.form {
+  margin-top: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+}
+
+.formHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.formTitle {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-1);
+}
+
+.formMeta {
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.nameInput {
+  padding: 8px 12px;
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-sm);
+  color: var(--text-1);
+  font-family: inherit;
+  font-size: 13px;
+  outline: none;
+  width: 100%;
+}
+
+.swatchRow {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.swatchButton {
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  cursor: pointer;
+  outline-offset: 2px;
+  transition: outline 0.1s, transform 0.12s;
+}
+
+.swatchButtonActive {
+  outline: 2px solid white;
+  transform: scale(1.06);
+}
+
+.actionRow {
+  display: flex;
+  gap: 8px;
+}
+
+.cancelButton,
+.saveButton {
+  padding: 8px 14px;
+  border-radius: var(--r-sm);
+  font-family: inherit;
+  font-size: 13px;
+}
+
+.cancelButton {
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  color: var(--text-2);
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.saveButton {
+  flex: 1;
+  border: none;
+  color: white;
+  font-weight: 700;
+}

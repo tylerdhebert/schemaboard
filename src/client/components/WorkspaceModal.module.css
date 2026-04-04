@@ -1,0 +1,193 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.62);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 120;
+}
+
+.modal {
+  width: 560px;
+  max-width: calc(100vw - 32px);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  box-shadow: var(--shadow-lg);
+  padding: 22px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+}
+
+.title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-1);
+}
+
+.subtitle {
+  font-size: 12px;
+  color: var(--text-3);
+  margin-top: 3px;
+}
+
+.closeButton {
+  background: none;
+  border: none;
+  color: var(--text-3);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 13px;
+}
+
+.workspaceList {
+  max-height: 280px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+}
+
+.workspaceEmpty {
+  padding: 16px;
+  font-size: 13px;
+  color: var(--text-3);
+}
+
+.workspaceRow {
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.workspaceRowActive {
+  background: var(--accent-light);
+}
+
+.workspaceMeta {
+  flex: 1;
+  min-width: 0;
+}
+
+.workspaceName {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-1);
+}
+
+.workspaceNameActive {
+  color: var(--accent);
+}
+
+.workspaceTimestamp {
+  font-size: 11.5px;
+  color: var(--text-3);
+  margin-top: 2px;
+}
+
+.inlineButton {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 12.5px;
+}
+
+.loadButton {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.deleteButton {
+  color: var(--text-3);
+}
+
+.formSection {
+  margin-top: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sectionLabel {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.7px;
+}
+
+.loadedWorkspace {
+  font-size: 12px;
+  color: var(--accent);
+}
+
+.nameInput {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-sm);
+  background: var(--bg);
+  color: var(--text-1);
+  font-family: inherit;
+  font-size: 13px;
+  outline: none;
+}
+
+.error {
+  font-size: 12px;
+  color: var(--err-color);
+  padding: 7px 10px;
+  border-radius: 6px;
+  background: var(--err-bg);
+}
+
+.actionRow {
+  display: flex;
+  gap: 8px;
+}
+
+.secondaryAction,
+.primaryAction {
+  flex: 1;
+  padding: 9px 14px;
+  border-radius: var(--r-sm);
+  font-family: inherit;
+  font-size: 13px;
+}
+
+.secondaryAction {
+  border: 1px solid var(--border-strong);
+  background: var(--bg);
+  font-weight: 600;
+  color: var(--text-1);
+  cursor: pointer;
+}
+
+.primaryAction {
+  border: none;
+  color: white;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.secondaryActionDisabled {
+  color: var(--text-3);
+  cursor: not-allowed;
+}
+
+.primaryActionEnabled {
+  background: var(--accent);
+}
+
+.primaryActionDisabled {
+  background: rgba(255, 255, 255, 0.1);
+  cursor: not-allowed;
+}

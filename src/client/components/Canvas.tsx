@@ -16,6 +16,7 @@ import { TableNode } from './TableNode'
 import { computeLayout } from '../lib/layout'
 import { useStore } from '../store'
 import type { Group, SchemaData, SchemaTable } from '../../types'
+import styles from './Canvas.module.css'
 
 const EDGE_ACTIVE_STROKE = 'rgba(74,123,245,0.5)'
 const EDGE_DIM_STROKE = 'rgba(255,255,255,0.06)'
@@ -43,7 +44,7 @@ function getNodeBox(node: Node & { measured?: { width?: number; height?: number 
 }
 
 function ZoomController() {
-  const { zoomToTable, setZoomToTable, fitToNodes, setFitToNodes, fitViewKey } = useStore()
+  const { fitToNodes, fitViewKey, setFitToNodes, setZoomToTable, zoomToTable } = useStore()
   const { fitView, getNode, setCenter, setViewport } = useReactFlow()
   const prevFitViewKey = useRef(fitViewKey)
   const frameRef = useRef<number | null>(null)
@@ -151,17 +152,17 @@ type BaseLayout = {
 
 export function Canvas({ schemaData, groups }: CanvasProps) {
   const {
-    selectedTables,
+    compactNodes,
     hiddenGroups,
     hiddenTables,
-    tablePositions,
     layoutKey,
     layoutType,
     searchQuery,
-    compactNodes,
-    toggleTable,
-    triggerFitView,
+    selectedTables,
     setTablePosition,
+    toggleTable,
+    tablePositions,
+    triggerFitView,
   } = useStore()
 
   const tableToGroups = useMemo(() => {
@@ -169,18 +170,15 @@ export function Canvas({ schemaData, groups }: CanvasProps) {
     for (const group of groups) {
       for (const tableName of group.tables) {
         const existing = map.get(tableName)
-        if (existing) {
-          existing.push(group)
-        } else {
-          map.set(tableName, [group])
-        }
+        if (existing) existing.push(group)
+        else map.set(tableName, [group])
       }
     }
     return map
   }, [groups])
 
-  const visibleTables = useMemo(() =>
-    schemaData.tables.filter(table => {
+  const visibleTables = useMemo(
+    () => schemaData.tables.filter(table => {
       const id = `${table.schema}.${table.name}`
       if (hiddenTables.has(id)) return false
 
@@ -213,16 +211,19 @@ export function Canvas({ schemaData, groups }: CanvasProps) {
   const [rfNodes, setRfNodes, onNodesChange] = useNodesState<Node>([])
   const [rfEdges, setRfEdges, onEdgesChange] = useEdgesState<Edge>([])
   const appliedLayoutRef = useRef<BaseLayout | null>(null)
+  const prevTablePositionsRef = useRef(tablePositions)
 
   useEffect(() => {
     const isNewLayout = appliedLayoutRef.current !== baseLayout
+    const positionsChanged = prevTablePositionsRef.current !== tablePositions
     appliedLayoutRef.current = baseLayout
+    prevTablePositionsRef.current = tablePositions
 
     const hasSelection = selectedTables.size > 0
     const query = searchQuery.length >= 2 ? searchQuery : ''
 
     setRfNodes(previousNodes => {
-      const previousPositions = (isNewLayout && baseLayout.fresh)
+      const previousPositions = (isNewLayout && baseLayout.fresh) || positionsChanged
         ? null
         : new Map(previousNodes.map(node => [node.id, node.position]))
 
@@ -271,13 +272,7 @@ export function Canvas({ schemaData, groups }: CanvasProps) {
   }, [setTablePosition])
 
   return (
-    <div style={{
-      width: '100%',
-      height: '100%',
-      background: 'var(--canvas)',
-      backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.07) 1px, transparent 1px)',
-      backgroundSize: '22px 22px',
-    }}>
+    <div className={styles.canvas}>
       <ReactFlow
         nodes={rfNodes}
         edges={rfEdges}
@@ -297,11 +292,7 @@ export function Canvas({ schemaData, groups }: CanvasProps) {
         <MiniMap
           nodeColor={node => (node.data as { selected?: boolean }).selected ? '#4a7bf5' : 'rgba(255,255,255,0.12)'}
           maskColor="rgba(0,0,0,0.45)"
-          style={{
-            background: 'var(--surface)',
-            border: '1px solid var(--border)',
-            borderRadius: 'var(--r-sm)',
-          }}
+          className={styles.miniMap}
         />
       </ReactFlow>
     </div>

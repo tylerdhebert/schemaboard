@@ -1,0 +1,518 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.64);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 16px;
+}
+
+.modal {
+  width: 980px;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+  background: var(--surface);
+  border-radius: 22px;
+  border: 1px solid var(--border);
+  padding: 22px;
+  box-shadow: var(--shadow-lg);
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.title {
+  font-size: 21px;
+  font-weight: 800;
+  letter-spacing: -0.6px;
+  color: var(--text-1);
+}
+
+.subtitle {
+  margin-top: 5px;
+  font-size: 12.5px;
+  color: var(--text-3);
+  line-height: 1.5;
+}
+
+.closeButton,
+.ghostButton,
+.inlineButton {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.closeButton {
+  font-size: 13px;
+  color: var(--text-3);
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr);
+  gap: 18px;
+}
+
+.registrySection,
+.editorSection,
+.connectionCard,
+.editingBanner,
+.testBanner {
+  border: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.registrySection,
+.editorSection {
+  border-radius: 18px;
+  padding: 16px;
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.sectionTitle {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-1);
+}
+
+.sectionMeta {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.7px;
+  color: var(--text-3);
+  font-weight: 700;
+}
+
+.emptyState {
+  padding: 12px 4px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-3);
+}
+
+.connectionList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.connectionCard {
+  border-radius: 14px;
+  padding: 12px;
+}
+
+.connectionCardActive {
+  border-color: rgba(74, 123, 245, 0.32);
+  background: rgba(74, 123, 245, 0.08);
+}
+
+.connectionCardHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.connectionIdentity {
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.statusDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ok-color);
+  margin-top: 6px;
+  flex-shrink: 0;
+}
+
+.connectionName {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-1);
+  word-break: break-word;
+}
+
+.connectionMeta {
+  margin-top: 3px;
+  font-size: 11.5px;
+  color: var(--text-3);
+}
+
+.connectionActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.inlineButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.inlineButtonPrimary {
+  color: var(--accent);
+}
+
+.inlineButtonMuted {
+  color: var(--text-3);
+}
+
+.editingBanner {
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.editingText {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.ghostButton {
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.segment {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 13px;
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+}
+
+.segmentButton {
+  flex: 1;
+  padding: 8px 10px;
+  border-radius: 9px;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  transition: background 0.15s, color 0.15s;
+}
+
+.segmentButtonActive {
+  background: var(--surface);
+  color: var(--text-1);
+}
+
+.segmentButtonIdle {
+  background: transparent;
+  color: var(--text-3);
+}
+
+.fieldBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.fieldHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.fieldLabel {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-3);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.fieldHint {
+  font-size: 11px;
+  color: var(--text-3);
+}
+
+.input {
+  padding: 10px 12px;
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  color: var(--text-1);
+  font-family: inherit;
+  font-size: 13px;
+  outline: none;
+  width: 100%;
+}
+
+.inputReadOnlyName {
+  opacity: 0.6;
+}
+
+.schemaChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.schemaButton {
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.schemaButtonActive {
+  border: 1px solid var(--accent);
+  background: var(--accent-light);
+  color: var(--accent);
+}
+
+.schemaButtonIdle {
+  border: 1px solid var(--border-strong);
+  background: transparent;
+  color: var(--text-3);
+}
+
+.chipInputWrap {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  min-height: 42px;
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  cursor: text;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--accent-light);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.chipRemove {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--accent);
+  padding: 0;
+  line-height: 1;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+}
+
+.chipInput {
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text-1);
+  font-family: inherit;
+  font-size: 12px;
+  min-width: 140px;
+  flex: 1;
+}
+
+.tableRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.secondaryButton,
+.actionButton {
+  padding: 9px 14px;
+  border-radius: 12px;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+.secondaryButton {
+  border: 1px solid var(--border-strong);
+  background: var(--bg);
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+.secondaryButtonDisabled,
+.actionButtonDisabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.checkboxLabel {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.checkbox {
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  border-radius: 5px;
+  border: 1px solid var(--border-strong);
+  background: rgba(255, 255, 255, 0.03);
+  transition: background 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 10px 10px;
+  flex-shrink: 0;
+}
+
+.checkbox:checked {
+  border-color: var(--accent);
+  background-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(74, 123, 245, 0.14);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='none' stroke='white' stroke-linecap='round' stroke-linejoin='round' stroke-width='2.2' d='M3.5 8.5 6.5 11.5 12.5 4.8'/%3E%3C/svg%3E");
+}
+
+.checkbox:focus-visible {
+  outline: 2px solid rgba(74, 123, 245, 0.45);
+  outline-offset: 2px;
+}
+
+.checkboxText {
+  font-size: 13px;
+  color: var(--text-2);
+  font-weight: 500;
+}
+
+.testBanner {
+  padding: 10px 12px;
+  border-radius: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.testBannerOk {
+  color: var(--ok-color);
+  background: rgba(34, 197, 94, 0.08);
+  border-color: rgba(34, 197, 94, 0.22);
+}
+
+.testBannerError {
+  color: var(--err-color);
+  background: var(--err-bg);
+  border-color: rgba(239, 68, 68, 0.2);
+}
+
+.actionRow {
+  display: flex;
+  gap: 10px;
+}
+
+.actionButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+}
+
+.testButton {
+  border: 1px solid var(--border-strong);
+  background: var(--bg);
+  color: var(--text-2);
+}
+
+.testButtonOk {
+  color: var(--ok-color);
+}
+
+.testButtonError {
+  color: var(--err-color);
+}
+
+.saveButton {
+  flex: 1;
+  border: none;
+  color: white;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.saveButtonEnabled {
+  background: var(--accent);
+}
+
+@media (max-width: 900px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .modal {
+    padding: 18px;
+  }
+
+  .header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .connectionCardHeader,
+  .editingBanner,
+  .actionRow {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .connectionActions {
+    justify-content: flex-start;
+  }
+}

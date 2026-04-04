@@ -1,0 +1,163 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 300;
+}
+
+.modal {
+  background: var(--surface);
+  border-radius: var(--r);
+  border: 1px solid var(--border);
+  width: 440px;
+  max-height: 72vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow-lg);
+}
+
+.header {
+  padding: 16px 18px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-1);
+  margin-bottom: 10px;
+}
+
+.searchInput {
+  width: 100%;
+  padding: 7px 10px;
+  box-sizing: border-box;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-sm);
+  font-family: inherit;
+  font-size: 12.5px;
+  color: var(--text-1);
+  background: var(--bg);
+  outline: none;
+}
+
+.selectAllRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 18px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  user-select: none;
+}
+
+.selectAllLabel {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-3);
+}
+
+.checkbox {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  border-radius: 5px;
+  border: 1px solid var(--border-strong);
+  background: rgba(255, 255, 255, 0.03);
+  cursor: pointer;
+  transition: background 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 10px 10px;
+}
+
+.checkbox:checked {
+  border-color: var(--accent);
+  background-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(74, 123, 245, 0.14);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='none' stroke='white' stroke-linecap='round' stroke-linejoin='round' stroke-width='2.2' d='M3.5 8.5 6.5 11.5 12.5 4.8'/%3E%3C/svg%3E");
+}
+
+.checkbox:focus-visible {
+  outline: 2px solid rgba(74, 123, 245, 0.45);
+  outline-offset: 2px;
+}
+
+.list {
+  flex: 1;
+  overflow-y: auto;
+  user-select: none;
+}
+
+.tableRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 18px;
+  cursor: pointer;
+}
+
+.tableRowSelected {
+  background: var(--sel-light);
+}
+
+.rowCheckbox {
+  pointer-events: none;
+}
+
+.rowLabel {
+  font-size: 12.5px;
+  color: var(--text-1);
+  font-weight: 500;
+}
+
+.empty {
+  padding: 20px 18px;
+  font-size: 13px;
+  color: var(--text-3);
+}
+
+.footer {
+  padding: 12px 18px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.footerLabel {
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.footerActions {
+  display: flex;
+  gap: 8px;
+}
+
+.button {
+  padding: 7px 14px;
+  border-radius: var(--r-sm);
+  font-family: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.cancelButton {
+  border: 1px solid var(--border-strong);
+  font-weight: 600;
+  background: none;
+  color: var(--text-2);
+}
+
+.applyButton {
+  border: none;
+  font-weight: 700;
+  background: var(--accent);
+  color: white;
+}

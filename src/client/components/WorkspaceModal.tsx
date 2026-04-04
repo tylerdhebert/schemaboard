@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '../api/client'
 import { useStore } from '../store'
 import type { Workspace } from '../../types'
+import styles from './WorkspaceModal.module.css'
 
 interface WorkspaceModalProps {
   activeConnection: string
@@ -46,6 +47,19 @@ export function WorkspaceModal({
     [workspaces, activeWorkspaceId]
   )
 
+  function upsertWorkspaceCache(workspace: Workspace) {
+    qc.setQueryData(['workspaces', activeConnection], (current: Workspace[] | undefined) => {
+      const items = current ?? []
+      const existingIndex = items.findIndex(item => item.id === workspace.id)
+
+      if (existingIndex === -1) {
+        return [...items, workspace]
+      }
+
+      return items.map(item => item.id === workspace.id ? workspace : item)
+    })
+  }
+
   useEffect(() => {
     setName(activeWorkspace?.name ?? '')
   }, [activeWorkspace])
@@ -66,6 +80,7 @@ export function WorkspaceModal({
     },
     onSuccess: (workspace) => {
       setError('')
+      upsertWorkspaceCache(workspace)
       qc.invalidateQueries({ queryKey: ['workspaces', activeConnection] })
       onLoadWorkspace(workspace)
       onClose()
@@ -92,6 +107,7 @@ export function WorkspaceModal({
     },
     onSuccess: (workspace) => {
       setError('')
+      upsertWorkspaceCache(workspace)
       qc.invalidateQueries({ queryKey: ['workspaces', activeConnection] })
       onLoadWorkspace(workspace)
       onClose()
@@ -123,54 +139,26 @@ export function WorkspaceModal({
 
   return (
     <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        background: 'rgba(0,0,0,0.62)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 120,
-      }}
+      className={styles.overlay}
       onClick={onClose}
     >
       <div
-        style={{
-          width: 560,
-          maxWidth: 'calc(100vw - 32px)',
-          background: 'var(--surface)',
-          border: '1px solid var(--border)',
-          borderRadius: 'var(--r)',
-          boxShadow: 'var(--shadow-lg)',
-          padding: 22,
-        }}
+        className={styles.modal}
         onClick={event => event.stopPropagation()}
       >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
+        <div className={styles.header}>
           <div>
-            <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-1)' }}>Saved Workspaces</div>
-            <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 3 }}>
-              {activeConnection === '__demo__' ? 'Demo Mode' : activeConnection}
+            <div className={styles.title}>Saved Workspaces</div>
+            <div className={styles.subtitle}>
+              {activeConnection === '__demo__' ? 'Sample schema' : activeConnection}
             </div>
           </div>
-          <button
-            onClick={onClose}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: 'var(--text-3)',
-              cursor: 'pointer',
-              fontFamily: 'inherit',
-              fontSize: 13,
-            }}
-          >
-            Close
-          </button>
+          <button onClick={onClose} className={styles.closeButton}>Close</button>
         </div>
 
-        <div style={{ maxHeight: 280, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 'var(--r-sm)' }}>
+        <div className={styles.workspaceList}>
           {workspaces.length === 0 ? (
-            <div style={{ padding: 16, fontSize: 13, color: 'var(--text-3)' }}>
+            <div className={styles.workspaceEmpty}>
               No saved workspaces yet. Save the current view below.
             </div>
           ) : (
@@ -179,20 +167,13 @@ export function WorkspaceModal({
               return (
                 <div
                   key={workspace.id}
-                  style={{
-                    padding: '11px 14px',
-                    borderBottom: '1px solid var(--border)',
-                    background: active ? 'var(--accent-light)' : 'transparent',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 12,
-                  }}
+                  className={`${styles.workspaceRow} ${active ? styles.workspaceRowActive : ''}`}
                 >
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: active ? 'var(--accent)' : 'var(--text-1)' }}>
+                  <div className={styles.workspaceMeta}>
+                    <div className={`${styles.workspaceName} ${active ? styles.workspaceNameActive : ''}`}>
                       {workspace.name}
                     </div>
-                    <div style={{ fontSize: 11.5, color: 'var(--text-3)', marginTop: 2 }}>
+                    <div className={styles.workspaceTimestamp}>
                       Updated {formatDate(workspace.updatedAt)}
                     </div>
                   </div>
@@ -202,28 +183,13 @@ export function WorkspaceModal({
                       onLoadWorkspace(workspace)
                       onClose()
                     }}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      color: 'var(--accent)',
-                      cursor: 'pointer',
-                      fontFamily: 'inherit',
-                      fontSize: 12.5,
-                      fontWeight: 600,
-                    }}
+                    className={`${styles.inlineButton} ${styles.loadButton}`}
                   >
                     Load
                   </button>
                   <button
                     onClick={() => deleteMutation.mutate(workspace.id)}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      color: 'var(--text-3)',
-                      cursor: 'pointer',
-                      fontFamily: 'inherit',
-                      fontSize: 12.5,
-                    }}
+                    className={`${styles.inlineButton} ${styles.deleteButton}`}
                   >
                     Delete
                   </button>
@@ -233,12 +199,10 @@ export function WorkspaceModal({
           )}
         </div>
 
-        <div style={{ marginTop: 18, display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.7px' }}>
-            Save current view
-          </div>
+        <div className={styles.formSection}>
+          <div className={styles.sectionLabel}>Save current view</div>
           {activeWorkspace && (
-            <div style={{ fontSize: 12, color: 'var(--accent)' }}>
+            <div className={styles.loadedWorkspace}>
               Loaded workspace: {activeWorkspace.name}
             </div>
           )}
@@ -246,63 +210,23 @@ export function WorkspaceModal({
             value={name}
             onChange={event => setName(event.target.value)}
             placeholder="Workspace name"
-            style={{
-              width: '100%',
-              padding: '8px 12px',
-              border: '1px solid var(--border-strong)',
-              borderRadius: 'var(--r-sm)',
-              background: 'var(--bg)',
-              color: 'var(--text-1)',
-              fontFamily: 'inherit',
-              fontSize: 13,
-              outline: 'none',
-            }}
+            className={styles.nameInput}
           />
           {error && (
-            <div style={{
-              fontSize: 12,
-              color: 'var(--err-color)',
-              padding: '7px 10px',
-              borderRadius: 6,
-              background: 'var(--err-bg)',
-            }}>
-              {error}
-            </div>
+            <div className={styles.error}>{error}</div>
           )}
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div className={styles.actionRow}>
             <button
               onClick={() => createMutation.mutate()}
               disabled={!name || loading}
-              style={{
-                flex: 1,
-                padding: '9px 14px',
-                borderRadius: 'var(--r-sm)',
-                border: '1px solid var(--border-strong)',
-                background: 'var(--bg)',
-                color: name ? 'var(--text-1)' : 'var(--text-3)',
-                cursor: name ? 'pointer' : 'not-allowed',
-                fontFamily: 'inherit',
-                fontSize: 13,
-                fontWeight: 600,
-              }}
+              className={`${styles.secondaryAction} ${name ? '' : styles.secondaryActionDisabled}`}
             >
               {createMutation.isPending ? 'Saving...' : 'Save as new'}
             </button>
             <button
               onClick={() => updateMutation.mutate()}
               disabled={!activeWorkspaceId || !name || loading}
-              style={{
-                flex: 1,
-                padding: '9px 14px',
-                borderRadius: 'var(--r-sm)',
-                border: 'none',
-                background: activeWorkspaceId && name ? 'var(--accent-grad)' : 'rgba(255,255,255,0.1)',
-                color: 'white',
-                cursor: activeWorkspaceId && name ? 'pointer' : 'not-allowed',
-                fontFamily: 'inherit',
-                fontSize: 13,
-                fontWeight: 700,
-              }}
+              className={`${styles.primaryAction} ${activeWorkspaceId && name ? styles.primaryActionEnabled : styles.primaryActionDisabled}`}
             >
               {updateMutation.isPending ? 'Updating...' : 'Update current'}
             </button>

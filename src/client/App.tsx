@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Check, ChevronDown, Copy, EyeOff, FolderMinus, FolderPlus, Layers3, Maximize2, Plus, X } from 'lucide-react'
 import { api } from './api/client'
+import { generateCondensed, generateDDL } from './lib/context-generator'
 import { Canvas } from './components/Canvas'
 import { ContextPanel } from './components/ContextPanel'
 import { GroupModal } from './components/GroupModal'
@@ -8,33 +10,90 @@ import { Header } from './components/Header'
 import { SchemaDiffModal } from './components/SchemaDiffModal'
 import { Sidebar } from './components/Sidebar'
 import { WorkspaceModal } from './components/WorkspaceModal'
-import { useStore } from './store'
+import { useStore, workspaceStatesEqual } from './store'
 import type { Connection, Group, SchemaData, Workspace } from '../types'
+import styles from './App.module.css'
 
 const EMPTY_SCHEMA: SchemaData = { tables: [], foreignKeys: [] }
+const DEFAULT_LEFT_SIDEBAR_WIDTH = 320
+const DEFAULT_RIGHT_PANEL_WIDTH = 308
+const MIN_SIDEBAR_WIDTH = 240
+const MAX_SIDEBAR_WIDTH = 520
+const MIN_CONTEXT_PANEL_WIDTH = 260
+const MAX_CONTEXT_PANEL_WIDTH = 520
 
 function tableNameFromId(tableId: string): string {
   return tableId.split('.').slice(1).join('.')
+}
+
+function ContextMenuAction({
+  icon,
+  label,
+  meta,
+  onClick,
+  tone = 'default',
+}: {
+  icon: React.ReactNode
+  label: string
+  meta?: string
+  onClick: () => void
+  tone?: 'default' | 'danger'
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`${styles.menuAction} ${tone === 'danger' ? styles.menuActionDanger : ''}`}
+    >
+      <span className={styles.menuActionIcon}>{icon}</span>
+      <span className={styles.menuActionBody}>
+        <span className={styles.menuActionLabel}>{label}</span>
+        {meta && <span className={styles.menuActionMeta}>{meta}</span>}
+      </span>
+    </button>
+  )
 }
 
 export function App() {
   const {
     activeConnection,
     activeWorkspaceId,
+    appMode,
     applyWorkspaceState,
-    selectedTables,
+    compactNodes,
     clearSelection,
-    selectTables,
     deselectTables,
-    toggleTableVisibility,
+    format,
+    hiddenGroups,
+    hiddenTables,
+    layoutType,
+    selectTables,
+    selectedTables,
     setActiveWorkspaceId,
+    setFitToNodes,
     setHiddenTables,
+    tablePositions,
+    toggleTableVisibility,
   } = useStore()
-  const [groupModalState, setGroupModalState] = useState<{ initialTableName?: string | null; editGroupId?: string | null } | null>(null)
+
+  const [groupModalState, setGroupModalState] = useState<{ initialTableName?: string | null; initialTableNames?: string[] | null; editGroupId?: string | null } | null>(null)
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; tableId: string } | null>(null)
+  const [selectionMenu, setSelectionMenu] = useState<{ x: number; y: number } | null>(null)
   const [showWorkspaceModal, setShowWorkspaceModal] = useState(false)
   const [showDiffModal, setShowDiffModal] = useState(false)
+  const [copiedSelectionContext, setCopiedSelectionContext] = useState(false)
+  const [leftSidebarWidth, setLeftSidebarWidth] = useState(() => {
+    const stored = window.localStorage.getItem('schemaboard:left-sidebar-width')
+    return stored ? Number(stored) : DEFAULT_LEFT_SIDEBAR_WIDTH
+  })
+  const [rightPanelWidth, setRightPanelWidth] = useState(() => {
+    const stored = window.localStorage.getItem('schemaboard:right-panel-width')
+    return stored ? Number(stored) : DEFAULT_RIGHT_PANEL_WIDTH
+  })
+  const resizeStateRef = useRef<{ side: 'left' | 'right'; startX: number; startWidth: number } | null>(null)
   const qc = useQueryClient()
+  const isDemoMode = appMode === 'demo'
+  const effectiveConnection = isDemoMode ? '__demo__' : activeConnection
 
   const { data: connections = [] } = useQuery({
     queryKey: ['connections'],
@@ -55,20 +114,20 @@ export function App() {
   })
 
   const { data: workspaces = [] } = useQuery({
-    queryKey: ['workspaces', activeConnection],
-    enabled: !!activeConnection,
+    queryKey: ['workspaces', effectiveConnection],
+    enabled: !!effectiveConnection,
     queryFn: async () => {
-      const res = await api.api.workspaces.get({ query: { connection: activeConnection! } })
+      const res = await api.api.workspaces.get({ query: { connection: effectiveConnection! } })
       if (res.error) throw res.error
       return (res.data as Workspace[]) ?? []
     },
   })
 
   const { data: schemaData = EMPTY_SCHEMA, refetch } = useQuery({
-    queryKey: ['schema', activeConnection],
-    enabled: !!activeConnection,
+    queryKey: ['schema', appMode, effectiveConnection],
+    enabled: !!effectiveConnection,
     queryFn: async () => {
-      if (activeConnection === '__demo__') {
+      if (isDemoMode) {
         const res = await api.api.schema.demo.get()
         if (res.error) throw res.error
         return (res.data as SchemaData) ?? EMPTY_SCHEMA
@@ -88,15 +147,15 @@ export function App() {
 
   const lastHideConnectionRef = useRef<string | null>(null)
   useEffect(() => {
-    if (!activeConnection || !schemaData.tables.length) return
-    if (lastHideConnectionRef.current === activeConnection) return
+    if (!effectiveConnection || !schemaData.tables.length || isDemoMode) return
+    if (lastHideConnectionRef.current === effectiveConnection) return
 
-    lastHideConnectionRef.current = activeConnection
+    lastHideConnectionRef.current = effectiveConnection
     const connection = (connections as Connection[]).find(item => item.name === activeConnection)
     if (connection?.hideAllInitially) {
       setHiddenTables(schemaData.tables.map(table => `${table.schema}.${table.name}`))
     }
-  }, [activeConnection, schemaData, connections, setHiddenTables])
+  }, [effectiveConnection, isDemoMode, activeConnection, schemaData, connections, setHiddenTables])
 
   const assignGroupMutation = useMutation({
     mutationFn: async ({ groupId, tableName }: { groupId: string; tableName: string }) => {
@@ -128,6 +187,40 @@ export function App() {
     [workspaces, activeWorkspaceId]
   )
 
+  const currentWorkspaceState = useMemo(() => ({
+    selectedTables: [...selectedTables],
+    hiddenGroups: [...hiddenGroups],
+    hiddenTables: [...hiddenTables],
+    format,
+    layoutType,
+    compactNodes,
+    tablePositions: { ...tablePositions },
+  }), [selectedTables, hiddenGroups, hiddenTables, format, layoutType, compactNodes, tablePositions])
+  const isWorkspaceDirty = useMemo(
+    () => currentWorkspace ? !workspaceStatesEqual(currentWorkspace.state, currentWorkspaceState) : false,
+    [currentWorkspace, currentWorkspaceState]
+  )
+
+  const saveWorkspaceMutation = useMutation({
+    mutationFn: async () => {
+      if (!currentWorkspace) throw new Error('No workspace selected')
+
+      const res = await api.api.workspaces({ id: currentWorkspace.id }).put({
+        name: currentWorkspace.name,
+        state: currentWorkspaceState,
+      })
+
+      if (res.error) throw res.error
+      return res.data as Workspace
+    },
+    onSuccess: (workspace) => {
+      qc.setQueryData(['workspaces', effectiveConnection], (current: Workspace[] | undefined) => (
+        (current ?? []).map(item => item.id === workspace.id ? workspace : item)
+      ))
+      qc.invalidateQueries({ queryKey: ['workspaces', effectiveConnection] })
+    },
+  })
+
   const handleSelectGroup = useCallback((groupId: string) => {
     const group = (groups as Group[]).find(item => item.id === groupId)
     if (!group) return
@@ -153,14 +246,27 @@ export function App() {
     setCtxMenu({ x: event.clientX, y: event.clientY, tableId: target.dataset.tableId })
   }, [])
 
-  const openGroupModal = useCallback((initialTableName?: string | null, editGroupId?: string | null) => {
+  const openGroupModal = useCallback((initialTableName?: string | null, editGroupId?: string | null, initialTableNames?: string[] | null) => {
     setCtxMenu(null)
-    setGroupModalState({ initialTableName: initialTableName ?? null, editGroupId: editGroupId ?? null })
+    setSelectionMenu(null)
+    setGroupModalState({
+      initialTableName: initialTableName ?? null,
+      initialTableNames: initialTableNames ?? null,
+      editGroupId: editGroupId ?? null,
+    })
   }, [])
 
   const handleAssignTableToGroup = useCallback((tableId: string, groupId: string) => {
     assignGroupMutation.mutate({ groupId, tableName: tableNameFromId(tableId) })
     setCtxMenu(null)
+  }, [assignGroupMutation])
+
+  const handleAssignTablesToGroup = useCallback((tableIds: string[], groupId: string) => {
+    for (const tableId of tableIds) {
+      assignGroupMutation.mutate({ groupId, tableName: tableNameFromId(tableId) })
+    }
+    setCtxMenu(null)
+    setSelectionMenu(null)
   }, [assignGroupMutation])
 
   const handleUnassignTable = useCallback((tableId: string, groupId?: string) => {
@@ -176,207 +282,335 @@ export function App() {
   const ctxMenuGroups = ctxMenuTableName
     ? (groups as Group[]).filter(group => group.tables.includes(ctxMenuTableName))
     : []
+  const selectedTableNames = useMemo(
+    () => [...selectedTables].map(tableNameFromId),
+    [selectedTables]
+  )
+  const ctxMenuSelectedTableNames = ctxMenu && selectedTables.has(ctxMenu.tableId) && selectedTableNames.length > 1
+    ? selectedTableNames
+    : []
+  const assignableCtxGroups = useMemo(
+    () => (groups as Group[]).filter(group => !ctxMenuGroups.some(item => item.id === group.id)),
+    [groups, ctxMenuGroups]
+  )
+  const ctxMenuSummary = `${ctxMenuGroups.length} group${ctxMenuGroups.length === 1 ? '' : 's'}`
+  const selectedTableIds = useMemo(() => [...selectedTables], [selectedTables])
+  const selectedTableData = useMemo(
+    () => schemaData.tables.filter(table => selectedTables.has(`${table.schema}.${table.name}`)),
+    [schemaData.tables, selectedTables]
+  )
+  const selectionRelevantFKs = useMemo(() => {
+    const names = new Set(selectedTableData.map(table => table.name))
+    return schemaData.foreignKeys.filter(fk => names.has(fk.parentTable))
+  }, [schemaData.foreignKeys, selectedTableData])
+  const selectionContextText = useMemo(() => {
+    if (selectedTableData.length === 0) return ''
+    return format === 'condensed'
+      ? generateCondensed(selectedTableData, selectionRelevantFKs)
+      : generateDDL(selectedTableData, selectionRelevantFKs)
+  }, [selectedTableData, selectionRelevantFKs, format])
+
+  useEffect(() => {
+    window.localStorage.setItem('schemaboard:left-sidebar-width', String(leftSidebarWidth))
+  }, [leftSidebarWidth])
+
+  useEffect(() => {
+    window.localStorage.setItem('schemaboard:right-panel-width', String(rightPanelWidth))
+  }, [rightPanelWidth])
+
+  useEffect(() => {
+    if (!copiedSelectionContext) return
+    const timer = window.setTimeout(() => setCopiedSelectionContext(false), 1600)
+    return () => window.clearTimeout(timer)
+  }, [copiedSelectionContext])
+
+  useEffect(() => {
+    function handlePointerMove(event: MouseEvent) {
+      const resizeState = resizeStateRef.current
+      if (!resizeState) return
+
+      if (resizeState.side === 'left') {
+        const nextWidth = Math.max(
+          MIN_SIDEBAR_WIDTH,
+          Math.min(MAX_SIDEBAR_WIDTH, resizeState.startWidth + (event.clientX - resizeState.startX))
+        )
+        setLeftSidebarWidth(nextWidth)
+        return
+      }
+
+      const nextWidth = Math.max(
+        MIN_CONTEXT_PANEL_WIDTH,
+        Math.min(MAX_CONTEXT_PANEL_WIDTH, resizeState.startWidth - (event.clientX - resizeState.startX))
+      )
+      setRightPanelWidth(nextWidth)
+    }
+
+    function handlePointerUp() {
+      resizeStateRef.current = null
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+    }
+
+    window.addEventListener('mousemove', handlePointerMove)
+    window.addEventListener('mouseup', handlePointerUp)
+    return () => {
+      window.removeEventListener('mousemove', handlePointerMove)
+      window.removeEventListener('mouseup', handlePointerUp)
+    }
+  }, [])
+
+  function startResize(side: 'left' | 'right', event: React.MouseEvent<HTMLDivElement>) {
+    event.preventDefault()
+    resizeStateRef.current = {
+      side,
+      startX: event.clientX,
+      startWidth: side === 'left' ? leftSidebarWidth : rightPanelWidth,
+    }
+    document.body.style.cursor = 'col-resize'
+    document.body.style.userSelect = 'none'
+  }
+
+  async function handleCopySelectionContext(event: React.MouseEvent<HTMLButtonElement>) {
+    event.stopPropagation()
+    if (!selectionContextText) return
+    await navigator.clipboard.writeText(selectionContextText)
+    setCopiedSelectionContext(true)
+  }
 
   return (
-    <div
-      style={{ height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
-      onClick={() => setCtxMenu(null)}
-      onContextMenu={handleContextMenu}
-    >
+    <div className={styles.app} onClick={() => {
+      setCtxMenu(null)
+      setSelectionMenu(null)
+    }} onContextMenu={handleContextMenu}>
       <Header
+        isDemoMode={isDemoMode}
+        hasActiveSource={!!effectiveConnection}
         connections={connections as Connection[]}
         currentWorkspaceName={currentWorkspace?.name ?? null}
+        isWorkspaceDirty={isWorkspaceDirty}
+        canSaveWorkspace={!!currentWorkspace && isWorkspaceDirty && !saveWorkspaceMutation.isPending}
         onRefresh={() => refetch()}
+        onSaveWorkspace={() => saveWorkspaceMutation.mutate()}
         onOpenWorkspaces={() => setShowWorkspaceModal(true)}
         onOpenDiff={() => setShowDiffModal(true)}
       />
 
-      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-        {activeConnection && (
-          <Sidebar
-            schemaData={schemaData}
-            groups={groups as Group[]}
-            onSelectGroup={handleSelectGroup}
-            onOpenGroupModal={openGroupModal}
-            onAssignTableToGroup={handleAssignTableToGroup}
-            onUnassignTable={handleUnassignTable}
-          />
+      <div className={styles.main}>
+        {effectiveConnection && (
+          <>
+            <div className={styles.leftPane} style={{ width: leftSidebarWidth }}>
+              <Sidebar
+                schemaData={schemaData}
+                groups={groups as Group[]}
+                onSelectGroup={handleSelectGroup}
+                onOpenGroupModal={openGroupModal}
+                onAssignTableToGroup={handleAssignTableToGroup}
+                onAssignTablesToGroup={handleAssignTablesToGroup}
+                onUnassignTable={handleUnassignTable}
+              />
+            </div>
+            <div
+              className={`${styles.resizeHandle} ${styles.leftResizeHandle}`}
+              onMouseDown={event => startResize('left', event)}
+              title="Resize sidebar"
+            />
+          </>
         )}
 
-        <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
-          {activeConnection ? (
+        <div className={styles.canvasArea}>
+          {effectiveConnection ? (
             <Canvas schemaData={schemaData} groups={groups as Group[]} />
           ) : (
-            <div style={{
-              flex: 1,
-              height: '100%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: 'var(--text-3)',
-              fontSize: 14,
-              background: 'var(--canvas)',
-              backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.07) 1px, transparent 1px)',
-              backgroundSize: '22px 22px',
-            }}>
-              Select a connection above to load the schema
+            <div className={styles.emptyState}>
+              Select a live connection or enable Demo Mode to load a schema
             </div>
           )}
 
           {selectedTables.size > 0 && (
-            <div style={{
-              position: 'absolute',
-              top: 16,
-              left: '50%',
-              transform: 'translateX(-50%)',
-              background: 'var(--surface)',
-              border: '1px solid var(--border)',
-              borderRadius: 40,
-              padding: '5px 14px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 10,
-              boxShadow: 'var(--shadow-md)',
-              fontSize: 13,
-              fontWeight: 500,
-              color: 'var(--text-2)',
-              zIndex: 10,
-              pointerEvents: 'auto',
-            }}>
-              <span style={{ fontWeight: 800, color: 'var(--sel)' }}>{selectedTables.size}</span>
-              <span>table{selectedTables.size > 1 ? 's' : ''} selected</span>
+            <div className={styles.selectionBar}>
+              <div className={styles.selectionSummary}>
+                <span className={styles.selectionCount}>{selectedTables.size}</span>
+                <div className={styles.selectionCopy}>
+                  <span className={styles.selectionLabel}>table{selectedTables.size > 1 ? 's' : ''} selected</span>
+                  <span className={styles.selectionMeta}>Quick actions for the current selection</span>
+                </div>
+              </div>
               <button
+                type="button"
                 onClick={event => {
                   event.stopPropagation()
-                  selectedTables.forEach(id => toggleTableVisibility(id))
+                  setFitToNodes(selectedTableIds)
+                }}
+                className={styles.selectionButton}
+              >
+                <Maximize2 size={13} strokeWidth={2.2} />
+                Zoom
+              </button>
+              <button
+                type="button"
+                onClick={event => {
+                  event.stopPropagation()
+                  const rect = event.currentTarget.getBoundingClientRect()
+                  setSelectionMenu(current => current ? null : { x: rect.left, y: rect.bottom + 8 })
+                }}
+                className={`${styles.selectionButton} ${styles.selectionButtonPrimary}`}
+              >
+                <FolderPlus size={13} strokeWidth={2.2} />
+                Group
+                <ChevronDown size={12} strokeWidth={2.4} />
+              </button>
+              <button
+                type="button"
+                onClick={handleCopySelectionContext}
+                className={`${styles.selectionButton} ${styles.selectionButtonPrimary}`}
+              >
+                {copiedSelectionContext ? <Check size={13} strokeWidth={2.4} /> : <Copy size={13} strokeWidth={2.2} />}
+                {copiedSelectionContext ? 'Copied' : 'Copy context'}
+              </button>
+              <button
+                type="button"
+                onClick={event => {
+                  event.stopPropagation()
+                  selectedTableIds.forEach(id => toggleTableVisibility(id))
                   clearSelection()
                 }}
-                style={{
-                  fontSize: 11.5,
-                  color: 'var(--text-3)',
-                  cursor: 'pointer',
-                  padding: '2px 7px',
-                  borderRadius: 4,
-                  border: '1px solid var(--border-strong)',
-                  background: 'none',
-                  fontFamily: 'inherit',
-                }}
+                className={styles.selectionButton}
               >
+                <EyeOff size={13} strokeWidth={2.2} />
                 Hide
               </button>
               <button
+                type="button"
                 onClick={event => {
                   event.stopPropagation()
                   clearSelection()
                 }}
-                style={{
-                  fontSize: 11.5,
-                  color: 'var(--text-3)',
-                  cursor: 'pointer',
-                  padding: '2px 7px',
-                  borderRadius: 4,
-                  border: 'none',
-                  background: 'none',
-                  fontFamily: 'inherit',
-                }}
+                className={`${styles.selectionButton} ${styles.selectionButtonMuted}`}
               >
-                Clear x
+                <X size={13} strokeWidth={2.2} />
+                Clear
               </button>
             </div>
           )}
 
-          {ctxMenu && (
+          {selectionMenu && selectedTables.size > 0 && (
             <div
-              style={{
-                position: 'fixed',
-                left: ctxMenu.x,
-                top: ctxMenu.y,
-                background: 'var(--surface)',
-                border: '1px solid var(--border)',
-                borderRadius: 'var(--r-sm)',
-                boxShadow: 'var(--shadow-lg)',
-                zIndex: 50,
-                minWidth: 180,
-                overflow: 'hidden',
-              }}
+              className={styles.menu}
+              style={{ left: selectionMenu.x, top: selectionMenu.y }}
               onClick={event => event.stopPropagation()}
             >
-              {ctxMenuGroups.map(group => (
-                <div
-                  key={group.id}
-                  onClick={() => handleUnassignTable(ctxMenu.tableId, group.id)}
-                  style={{ padding: '8px 12px', fontSize: 13, cursor: 'pointer', color: 'var(--text-1)', fontWeight: 500 }}
-                >
-                  Unassign from {group.name}
-                </div>
-              ))}
-              <div
-                onClick={() => openGroupModal(ctxMenuTableName)}
-                style={{
-                  padding: '8px 12px',
-                  fontSize: 13,
-                  cursor: 'pointer',
-                  color: 'var(--text-1)',
-                  fontWeight: 500,
-                  borderTop: ctxMenuGroups.length > 0 ? '1px solid var(--border)' : 'none',
-                }}
-              >
-                Add to new group
+              <div className={styles.menuHeader}>
+                <div className={styles.menuEyebrow}>Selection</div>
+                <div className={styles.menuTitle}>{selectedTables.size} table{selectedTables.size === 1 ? '' : 's'}</div>
+                <div className={styles.menuMeta}>Group the current selection</div>
               </div>
-              <div style={{
-                padding: '4px 12px 3px',
-                fontSize: 10,
-                fontWeight: 700,
-                color: 'var(--text-3)',
-                textTransform: 'uppercase',
-                letterSpacing: '0.8px',
-                borderBottom: '1px solid var(--border)',
-                borderTop: '1px solid var(--border)',
-              }}>
-                Assign to group
+              <ContextMenuAction
+                icon={<Layers3 size={14} strokeWidth={2.1} />}
+                label="Add to new group"
+                meta="Create one group from all selected tables"
+                onClick={() => openGroupModal(null, null, selectedTableNames)}
+              />
+              <div className={styles.menuSection}>
+                <span>Add to existing group</span>
               </div>
-              {(groups as Group[]).filter(group => !ctxMenuGroups.some(item => item.id === group.id)).length === 0 && (
-                <div style={{ padding: '8px 12px', fontSize: 12, color: 'var(--text-3)' }}>
-                  No other groups
-                </div>
+              {groups.length === 0 && (
+                <div className={styles.menuEmpty}>No groups yet</div>
               )}
-              {(groups as Group[]).filter(group => !ctxMenuGroups.some(item => item.id === group.id)).map(group => (
-                <div
+              {(groups as Group[]).map(group => (
+                <button
                   key={group.id}
-                  onClick={() => handleAssignTableToGroup(ctxMenu.tableId, group.id)}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 8,
-                    padding: '8px 12px',
-                    cursor: 'pointer',
-                    fontSize: 13,
-                    color: 'var(--text-1)',
-                  }}
+                  type="button"
+                  onClick={() => handleAssignTablesToGroup(selectedTableIds, group.id)}
+                  className={styles.menuGroupItem}
                 >
-                  <div style={{ width: 9, height: 9, borderRadius: 3, background: group.color, flexShrink: 0 }} />
-                  {group.name}
-                </div>
+                  <div className={styles.menuSwatch} style={{ background: group.color }} />
+                  <span className={styles.menuGroupName}>{group.name}</span>
+                  <span className={styles.menuGroupMeta}>
+                    <span className={styles.menuGroupCount}>{selectedTables.size}</span>
+                    <span className={styles.menuGroupBadge}>
+                      <Plus size={11} strokeWidth={2.4} />
+                    </span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {ctxMenu && (
+            <div className={styles.menu} style={{ left: ctxMenu.x, top: ctxMenu.y }} onClick={event => event.stopPropagation()}>
+              <div className={styles.menuHeader}>
+                <div className={styles.menuEyebrow}>Table</div>
+                <div className={styles.menuTitle}>{ctxMenuTableName}</div>
+                <div className={styles.menuMeta}>{ctxMenuSummary}</div>
+              </div>
+              {ctxMenuGroups.map(group => (
+                <ContextMenuAction
+                  key={group.id}
+                  icon={<FolderMinus size={14} strokeWidth={2.1} />}
+                  label={`Remove from ${group.name}`}
+                  meta="Unassign from this group"
+                  onClick={() => handleUnassignTable(ctxMenu.tableId, group.id)}
+                  tone="danger"
+                />
+              ))}
+              {ctxMenuGroups.length > 0 && <div className={styles.menuDivider} />}
+              <ContextMenuAction
+                icon={<FolderPlus size={14} strokeWidth={2.1} />}
+                label="Add to new group"
+                meta="Create a group from this table"
+                onClick={() => openGroupModal(ctxMenuTableName)}
+              />
+              <div className={styles.menuSection}>
+                <span>Assign to group</span>
+              </div>
+              {assignableCtxGroups.length === 0 && (
+                <div className={styles.menuEmpty}>No other groups</div>
+              )}
+              {assignableCtxGroups.map(group => (
+                <button
+                  key={group.id}
+                  type="button"
+                  onClick={() => handleAssignTableToGroup(ctxMenu.tableId, group.id)}
+                  className={styles.menuGroupItem}
+                >
+                  <div className={styles.menuSwatch} style={{ background: group.color }} />
+                  <span className={styles.menuGroupName}>{group.name}</span>
+                  <span className={styles.menuGroupBadge}>
+                    <Plus size={11} strokeWidth={2.4} />
+                  </span>
+                </button>
               ))}
             </div>
           )}
         </div>
 
-        {activeConnection && <ContextPanel schemaData={schemaData} />}
+        {effectiveConnection && (
+          <>
+            <div
+              className={`${styles.resizeHandle} ${styles.rightResizeHandle}`}
+              onMouseDown={event => startResize('right', event)}
+              title="Resize context panel"
+            />
+            <div className={styles.rightPane} style={{ width: rightPanelWidth }}>
+              <ContextPanel schemaData={schemaData} />
+            </div>
+          </>
+        )}
       </div>
 
       {groupModalState && (
         <GroupModal
           groups={groups as Group[]}
           initialTableName={groupModalState.initialTableName}
+          initialTableNames={groupModalState.initialTableNames}
           editGroupId={groupModalState.editGroupId}
           onClose={() => setGroupModalState(null)}
         />
       )}
 
-      {showWorkspaceModal && activeConnection && (
+      {showWorkspaceModal && effectiveConnection && (
         <WorkspaceModal
-          activeConnection={activeConnection}
+          activeConnection={effectiveConnection}
           workspaces={workspaces as Workspace[]}
           activeWorkspaceId={activeWorkspaceId}
           onLoadWorkspace={handleLoadWorkspace}
@@ -384,9 +618,9 @@ export function App() {
         />
       )}
 
-      {showDiffModal && activeConnection && (
+      {showDiffModal && effectiveConnection && (
         <SchemaDiffModal
-          activeConnection={activeConnection}
+          activeConnection={effectiveConnection}
           currentSchema={schemaData}
           connections={connections as Connection[]}
           onClose={() => setShowDiffModal(false)}

@@ -1,0 +1,209 @@
+.panel {
+  width: 100%;
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.header {
+  padding: 16px 18px 13px;
+  border-bottom: 1px solid var(--border);
+}
+
+.title {
+  font-size: 13.5px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+  margin-bottom: 3px;
+  color: var(--text-1);
+}
+
+.subtitle {
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.formatRow {
+  display: flex;
+  padding: 12px 18px 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.formatButton {
+  flex: 1;
+  padding: 7px 0;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+  cursor: pointer;
+  border: 1px solid var(--border-strong);
+  font-family: inherit;
+}
+
+.formatButtonLeft {
+  border-radius: 8px 0 0 8px;
+}
+
+.formatButtonRight {
+  border-left: none;
+  border-radius: 0 8px 8px 0;
+}
+
+.formatButtonActive {
+  background: var(--accent);
+  color: white;
+}
+
+.formatButtonInactive {
+  background: var(--bg);
+  color: var(--text-2);
+}
+
+.previewHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 18px 6px;
+}
+
+.previewLabel {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+
+.previewActions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.smallButton {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 5px;
+  border: 1px solid var(--border-strong);
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.smallButtonMuted {
+  background: transparent;
+  color: var(--text-3);
+}
+
+.smallButtonActive {
+  background: var(--accent);
+  color: white;
+}
+
+.smallButtonDisabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.body {
+  flex: 1;
+  overflow: hidden;
+  padding: 0 18px 14px;
+  display: flex;
+  flex-direction: column;
+}
+
+.textarea {
+  flex: 1;
+  width: 100%;
+  resize: none;
+  font-family: ui-monospace, Cascadia Code, monospace;
+  font-size: 11px;
+  line-height: 1.75;
+  color: var(--text-1);
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-sm);
+  padding: 10px 12px;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.previewScroll {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.previewText {
+  font-family: ui-monospace, Cascadia Code, monospace;
+  font-size: 11px;
+  line-height: 1.75;
+  color: var(--text-1);
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 0;
+}
+
+.emptyText {
+  color: var(--text-3);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.footer {
+  padding: 11px 18px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.tokenWrap {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.tokenBadge {
+  font-size: 11px;
+  font-weight: 800;
+  padding: 3px 9px;
+  border-radius: 20px;
+  background: var(--accent-light);
+  color: var(--accent);
+}
+
+.tokenLabel {
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.copyButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: var(--r-sm);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  border: none;
+  color: white;
+}
+
+.copyButtonEnabled {
+  cursor: pointer;
+  background: var(--accent);
+  box-shadow: 0 2px 10px rgba(74, 123, 245, 0.28);
+  opacity: 1;
+}
+
+.copyButtonDisabled {
+  cursor: not-allowed;
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: none;
+  opacity: 0.5;
+}

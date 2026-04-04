@@ -1,8 +1,10 @@
-import { useState, useRef } from 'react'
+import { useRef, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { CheckCircle2, Database, PencilLine, Plus, Trash2, XCircle } from 'lucide-react'
 import { api } from '../api/client'
 import type { Connection, DbType } from '../../types'
 import { TablePicker } from './TablePicker'
+import styles from './ConnectionModal.module.css'
 
 interface ConnectionModalProps {
   connections: Connection[]
@@ -42,7 +44,7 @@ export function ConnectionModal({ connections, onClose }: ConnectionModalProps) 
 
   const currentTestSignature = `${dbType}::${connStr}`
 
-  const resetForm = () => {
+  function resetForm() {
     setEditingName(null)
     setName('')
     setConnStr('')
@@ -58,7 +60,7 @@ export function ConnectionModal({ connections, onClose }: ConnectionModalProps) 
     setTestedSignature(null)
   }
 
-  const startEdit = (conn: Connection) => {
+  function startEdit(conn: Connection) {
     setEditingName(conn.name)
     setName(conn.name)
     setConnStr(conn.connectionString)
@@ -74,7 +76,7 @@ export function ConnectionModal({ connections, onClose }: ConnectionModalProps) 
     setTestedSignature(null)
   }
 
-  const runConnectionTest = async () => {
+  async function runConnectionTest() {
     const res = await api.api.connections.test.post({ connectionString: connStr, type: dbType })
     const data = res.data as { ok: boolean; schemas?: string[]; error?: string } | null
 
@@ -112,15 +114,16 @@ export function ConnectionModal({ connections, onClose }: ConnectionModalProps) 
         const encoded = encodeURIComponent(editingName)
         const res = await api.api.connections({ name: encoded }).put(payload)
         if (res.error) throw new Error((res.error as { value?: { error?: string } }).value?.error ?? 'Failed to save')
-      } else {
-        const res = await api.api.connections.post(payload)
-        if (res.error) throw new Error((res.error as { value?: { error?: string } }).value?.error ?? 'Failed to add connection')
+        return
       }
+
+      const res = await api.api.connections.post(payload)
+      if (res.error) throw new Error((res.error as { value?: { error?: string } }).value?.error ?? 'Failed to add connection')
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['connections'] })
       resetForm()
-    }
+    },
   })
 
   const deleteMutation = useMutation({
@@ -129,10 +132,10 @@ export function ConnectionModal({ connections, onClose }: ConnectionModalProps) 
       const res = await api.api.connections({ name: encoded }).delete()
       if (res.error) throw res.error
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['connections'] })
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['connections'] }),
   })
 
-  const handleTest = async () => {
+  async function handleTest() {
     setTestResult('idle')
     setTestError('')
     setAvailableSchemas([])
@@ -144,18 +147,18 @@ export function ConnectionModal({ connections, onClose }: ConnectionModalProps) 
     }
   }
 
-  const addChip = (value: string) => {
+  function addChip(value: string) {
     const schema = value.trim()
     if (schema && !excludedSchemas.includes(schema)) {
       setExcludedSchemas(prev => [...prev, schema])
     }
   }
 
-  const removeChip = (schema: string) => {
+  function removeChip(schema: string) {
     setExcludedSchemas(prev => prev.filter(s => s !== schema))
   }
 
-  const handleChipKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  function handleChipKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if ((e.key === ' ' || e.key === 'Enter') && chipInput.trim()) {
       e.preventDefault()
       addChip(chipInput)
@@ -165,7 +168,7 @@ export function ConnectionModal({ connections, onClose }: ConnectionModalProps) 
     }
   }
 
-  const handleLoadTables = async () => {
+  async function handleLoadTables() {
     setLoadingTables(true)
     try {
       const res = await api.api.connections.tables.post({ connectionString: connStr, type: dbType })
@@ -177,7 +180,7 @@ export function ConnectionModal({ connections, onClose }: ConnectionModalProps) 
     }
   }
 
-  const toggleAvailableSchema = (schema: string) => {
+  function toggleAvailableSchema(schema: string) {
     if (excludedSchemas.includes(schema)) {
       removeChip(schema)
     } else {
@@ -185,22 +188,14 @@ export function ConnectionModal({ connections, onClose }: ConnectionModalProps) 
     }
   }
 
+  const testLabel =
+    testResult === 'ok' ? 'Connected' :
+    testResult === 'error' ? 'Failed' :
+    'Test connection'
+
   return (
-    <div
-      style={{
-        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100,
-      }}
-      onClick={onClose}
-    >
-      <div
-        style={{
-          background: 'var(--surface)', borderRadius: 'var(--r)',
-          border: '1px solid var(--border)', padding: 24, width: 460,
-          boxShadow: 'var(--shadow-lg)',
-        }}
-        onClick={e => e.stopPropagation()}
-      >
+    <div className={styles.overlay} onClick={onClose}>
+      <div className={styles.modal} onClick={e => e.stopPropagation()}>
         {tablePickerOpen && availableTables && (
           <TablePicker
             tables={availableTables}
@@ -210,270 +205,236 @@ export function ConnectionModal({ connections, onClose }: ConnectionModalProps) 
             title="Choose included tables"
           />
         )}
-        <h2 style={{ fontSize: 15, fontWeight: 700, marginBottom: 20, color: 'var(--text-1)' }}>
-          Manage Connections
-        </h2>
 
-        {connections.length === 0 && (
-          <p style={{ fontSize: 13, color: 'var(--text-3)', marginBottom: 16 }}>
-            No connections yet. Add one below.
-          </p>
-        )}
-
-        {connections.map(c => (
-          <div key={c.name} style={{
-            display: 'flex', alignItems: 'center', gap: 10,
-            padding: '8px 0', borderBottom: '1px solid var(--border)',
-          }}>
-            <div style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--ok-color)', flexShrink: 0 }} />
-            <span style={{ flex: 1, fontSize: 13, fontWeight: 500, color: 'var(--text-1)' }}>{c.name}</span>
-            <span style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 500 }}>{DB_TYPE_LABELS[c.type]}</span>
-            <button
-              onClick={() => startEdit(c)}
-              style={{
-                background: 'none', border: 'none', color: 'var(--accent)',
-                cursor: 'pointer', fontSize: 13, fontFamily: 'inherit',
-              }}
-            >
-              Edit
-            </button>
-            <button
-              onClick={() => deleteMutation.mutate(c.name)}
-              style={{
-                background: 'none', border: 'none', color: 'var(--text-3)',
-                cursor: 'pointer', fontSize: 13, fontFamily: 'inherit',
-              }}
-            >
-              Remove
-            </button>
-          </div>
-        ))}
-
-        <div style={{ marginTop: 20, display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {editingName !== null && (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent)' }}>Editing "{editingName}"</span>
-              <button onClick={resetForm} style={{ background: 'none', border: 'none', fontSize: 12, color: 'var(--text-3)', cursor: 'pointer', fontFamily: 'inherit' }}>Cancel</button>
-            </div>
-          )}
-          {/* DB type segmented control */}
-          <div style={{
-            display: 'flex', gap: 2,
-            background: 'var(--bg)', borderRadius: 'var(--r-sm)',
-            border: '1px solid var(--border-strong)', padding: 3,
-          }}>
-            {(['sqlserver', 'postgres', 'sqlite'] as DbType[]).map(t => (
-              <button
-                key={t}
-                onClick={() => { setDbType(t); setTestResult('idle'); setAvailableSchemas([]) }}
-                style={{
-                  flex: 1, padding: '5px 8px',
-                  borderRadius: 5, border: 'none', cursor: 'pointer',
-                  fontFamily: 'inherit', fontSize: 12, fontWeight: 600,
-                  background: dbType === t ? 'var(--surface)' : 'transparent',
-                  color: dbType === t ? 'var(--text-1)' : 'var(--text-3)',
-                  transition: 'background 0.15s, color 0.15s',
-                }}
-              >
-                {DB_TYPE_LABELS[t]}
-              </button>
-            ))}
-          </div>
-
-          <input
-            value={name}
-            onChange={e => setName(e.target.value)}
-            placeholder="Connection name (e.g. Local Dev)"
-            style={{ ...inputStyle, opacity: editingName !== null ? 0.6 : 1 }}
-          />
-          <input
-            value={connStr}
-            onChange={e => { setConnStr(e.target.value); setTestResult('idle'); setAvailableSchemas([]) }}
-            placeholder={CONN_STR_PLACEHOLDER[dbType]}
-            style={inputStyle}
-          />
-
-          {/* Schema exclusion */}
+        <div className={styles.header}>
           <div>
-            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', marginBottom: 5, letterSpacing: '0.5px', textTransform: 'uppercase' }}>
-              Exclude schemas
+            <div className={styles.title}>Connections</div>
+            <div className={styles.subtitle}>Manage live data sources and default loading behavior.</div>
+          </div>
+          <button className={styles.closeButton} onClick={onClose}>Close</button>
+        </div>
+
+        <div className={styles.layout}>
+          <section className={styles.registrySection}>
+            <div className={styles.sectionHeader}>
+              <div className={styles.sectionTitle}>Saved sources</div>
+              <div className={styles.sectionMeta}>{connections.length} total</div>
             </div>
 
-            {/* Available schemas (shown after successful test) */}
-            {availableSchemas.length > 0 && (
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 7 }}>
-                {availableSchemas.map(schema => {
-                  const excluded = excludedSchemas.includes(schema)
+            {connections.length === 0 ? (
+              <div className={styles.emptyState}>
+                No live connections yet. Add one on the right to get started.
+              </div>
+            ) : (
+              <div className={styles.connectionList}>
+                {connections.map(connection => {
+                  const activeEdit = editingName === connection.name
                   return (
-                    <button
-                      key={schema}
-                      onClick={() => toggleAvailableSchema(schema)}
-                      style={{
-                        padding: '3px 9px', borderRadius: 20, fontSize: 11, fontWeight: 600,
-                        cursor: 'pointer', fontFamily: 'inherit',
-                        border: `1px solid ${excluded ? 'var(--accent)' : 'var(--border-strong)'}`,
-                        background: excluded ? 'var(--accent-light)' : 'transparent',
-                        color: excluded ? 'var(--accent)' : 'var(--text-3)',
-                      }}
-                    >
-                      {schema}
-                    </button>
+                    <div key={connection.name} className={`${styles.connectionCard} ${activeEdit ? styles.connectionCardActive : ''}`}>
+                      <div className={styles.connectionCardHeader}>
+                        <div className={styles.connectionIdentity}>
+                          <span className={styles.statusDot} />
+                          <div>
+                            <div className={styles.connectionName}>{connection.name}</div>
+                            <div className={styles.connectionMeta}>
+                              {DB_TYPE_LABELS[connection.type]}
+                              {connection.hideAllInitially ? ' - Hidden on load' : ''}
+                            </div>
+                          </div>
+                        </div>
+                        <div className={styles.connectionActions}>
+                          <button className={`${styles.inlineButton} ${styles.inlineButtonPrimary}`} onClick={() => startEdit(connection)}>
+                            <PencilLine size={13} strokeWidth={2.2} />
+                            Edit
+                          </button>
+                          <button className={`${styles.inlineButton} ${styles.inlineButtonMuted}`} onClick={() => deleteMutation.mutate(connection.name)}>
+                            <Trash2 size={13} strokeWidth={2.2} />
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+                    </div>
                   )
                 })}
               </div>
             )}
+          </section>
 
-            {/* Chip input */}
-            <div
-              style={{
-                display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 5,
-                padding: '6px 10px', minHeight: 38,
-                background: 'var(--bg)', border: '1px solid var(--border-strong)',
-                borderRadius: 'var(--r-sm)', cursor: 'text',
-              }}
-              onClick={() => chipInputRef.current?.focus()}
-            >
-              {excludedSchemas.map(schema => (
-                <span
-                  key={schema}
-                  style={{
-                    display: 'inline-flex', alignItems: 'center', gap: 4,
-                    padding: '2px 8px', borderRadius: 20,
-                    background: 'var(--accent-light)', color: 'var(--accent)',
-                    fontSize: 11, fontWeight: 600,
-                  }}
-                >
-                  {schema}
-                  <button
-                    onClick={e => { e.stopPropagation(); removeChip(schema) }}
-                    style={{
-                      background: 'none', border: 'none', cursor: 'pointer',
-                      color: 'var(--accent)', padding: 0, lineHeight: 1,
-                      fontSize: 13, display: 'flex', alignItems: 'center',
-                    }}
-                  >
-                    ×
-                  </button>
-                </span>
-              ))}
-              <input
-                ref={chipInputRef}
-                value={chipInput}
-                onChange={e => setChipInput(e.target.value)}
-                onKeyDown={handleChipKeyDown}
-                placeholder={excludedSchemas.length === 0 ? 'Type a schema name, press space to add…' : ''}
-                style={{
-                  border: 'none', outline: 'none', background: 'transparent',
-                  color: 'var(--text-1)', fontFamily: 'inherit', fontSize: 12,
-                  minWidth: 120, flex: 1,
-                }}
-              />
+          <section className={styles.editorSection}>
+            <div className={styles.sectionHeader}>
+              <div className={styles.sectionTitle}>{editingName ? 'Edit source' : 'Add source'}</div>
+              <div className={styles.sectionMeta}>{editingName ? editingName : 'New connection'}</div>
             </div>
-          </div>
 
-          {/* Included tables filter */}
-          <div>
-            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', marginBottom: 5, letterSpacing: '0.5px', textTransform: 'uppercase' }}>
-              Included tables
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <button
-                onClick={handleLoadTables}
-                disabled={!connStr || loadingTables}
-                style={{
-                  padding: '6px 12px', borderRadius: 'var(--r-sm)',
-                  border: '1px solid var(--border-strong)', background: 'var(--bg)',
-                  fontFamily: 'inherit', fontSize: 12, fontWeight: 600,
-                  color: 'var(--text-2)', cursor: connStr ? 'pointer' : 'not-allowed',
-                }}
-              >
-                {loadingTables ? 'Loading…' : 'Choose tables…'}
-              </button>
-              {includedTables.length > 0 && (
-                <span style={{ fontSize: 12, color: 'var(--text-3)' }}>
-                  {includedTables.length} selected
-                </span>
-              )}
-              {includedTables.length > 0 && (
-                <button
-                  onClick={() => setIncludedTables([])}
-                  style={{
-                    background: 'none', border: 'none', cursor: 'pointer',
-                    fontSize: 11, color: 'var(--text-3)', fontFamily: 'inherit', padding: 0,
-                  }}
-                >
-                  Clear
-                </button>
-              )}
-            </div>
-            {includedTables.length === 0 && (
-              <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 4 }}>
-                All tables loaded by default
+            {editingName !== null && (
+              <div className={styles.editingBanner}>
+                <div className={styles.editingText}>Editing "{editingName}"</div>
+                <button className={styles.ghostButton} onClick={resetForm}>Cancel</button>
               </div>
             )}
-          </div>
 
-          {/* Hide all initially */}
-          <label style={{ display: 'flex', alignItems: 'center', gap: 9, cursor: 'pointer' }}>
-            <input
-              type="checkbox"
-              checked={hideAllInitially}
-              onChange={e => setHideAllInitially(e.target.checked)}
-              style={{ cursor: 'pointer', width: 14, height: 14 }}
-            />
-            <span style={{ fontSize: 13, color: 'var(--text-2)', fontWeight: 500 }}>
-              Hide all tables on load
-            </span>
-          </label>
+            <div className={styles.form}>
+              <div className={styles.segment}>
+                {(['sqlserver', 'postgres', 'sqlite'] as DbType[]).map(type => (
+                  <button
+                    key={type}
+                    onClick={() => {
+                      setDbType(type)
+                      setTestResult('idle')
+                      setAvailableSchemas([])
+                    }}
+                    className={`${styles.segmentButton} ${dbType === type ? styles.segmentButtonActive : styles.segmentButtonIdle}`}
+                  >
+                    {DB_TYPE_LABELS[type]}
+                  </button>
+                ))}
+              </div>
 
-          {testResult === 'error' && testError && (
-            <div style={{ fontSize: 12, color: 'var(--err-color)', padding: '6px 10px', background: 'var(--err-bg)', borderRadius: 6 }}>
-              {testError}
+              <div className={styles.fieldBlock}>
+                <div className={styles.fieldLabel}>Connection name</div>
+                <input
+                  value={name}
+                  onChange={e => setName(e.target.value)}
+                  placeholder="Local Dev, Staging API, Analytics Replica..."
+                  className={`${styles.input} ${editingName !== null ? styles.inputReadOnlyName : ''}`}
+                />
+              </div>
+
+              <div className={styles.fieldBlock}>
+                <div className={styles.fieldLabel}>Connection string</div>
+                <input
+                  value={connStr}
+                  onChange={e => {
+                    setConnStr(e.target.value)
+                    setTestResult('idle')
+                    setAvailableSchemas([])
+                  }}
+                  placeholder={CONN_STR_PLACEHOLDER[dbType]}
+                  className={styles.input}
+                />
+              </div>
+
+              <div className={styles.fieldBlock}>
+                <div className={styles.fieldHeader}>
+                  <div className={styles.fieldLabel}>Exclude schemas</div>
+                  {availableSchemas.length > 0 && (
+                    <div className={styles.fieldHint}>Click a schema chip to toggle exclusion</div>
+                  )}
+                </div>
+
+                {availableSchemas.length > 0 && (
+                  <div className={styles.schemaChips}>
+                    {availableSchemas.map(schema => {
+                      const excluded = excludedSchemas.includes(schema)
+                      return (
+                        <button
+                          key={schema}
+                          onClick={() => toggleAvailableSchema(schema)}
+                          className={`${styles.schemaButton} ${excluded ? styles.schemaButtonActive : styles.schemaButtonIdle}`}
+                        >
+                          {schema}
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+
+                <div className={styles.chipInputWrap} onClick={() => chipInputRef.current?.focus()}>
+                  {excludedSchemas.map(schema => (
+                    <span key={schema} className={styles.chip}>
+                      {schema}
+                      <button className={styles.chipRemove} onClick={e => { e.stopPropagation(); removeChip(schema) }}>
+                        x
+                      </button>
+                    </span>
+                  ))}
+                  <input
+                    ref={chipInputRef}
+                    value={chipInput}
+                    onChange={e => setChipInput(e.target.value)}
+                    onKeyDown={handleChipKeyDown}
+                    placeholder={excludedSchemas.length === 0 ? 'Type a schema name and press space or enter...' : ''}
+                    className={styles.chipInput}
+                  />
+                </div>
+              </div>
+
+              <div className={styles.fieldBlock}>
+                <div className={styles.fieldHeader}>
+                  <div className={styles.fieldLabel}>Included tables</div>
+                  <div className={styles.fieldHint}>
+                    {includedTables.length === 0 ? 'All tables load by default' : `${includedTables.length} selected`}
+                  </div>
+                </div>
+
+                <div className={styles.tableRow}>
+                  <button
+                    onClick={handleLoadTables}
+                    disabled={!connStr || loadingTables}
+                    className={`${styles.secondaryButton} ${connStr ? '' : styles.secondaryButtonDisabled}`}
+                  >
+                    {loadingTables ? 'Loading tables...' : includedTables.length > 0 ? 'Edit table selection' : 'Choose tables'}
+                  </button>
+                  {includedTables.length > 0 && (
+                    <button className={styles.ghostButton} onClick={() => setIncludedTables([])}>Clear</button>
+                  )}
+                </div>
+              </div>
+
+              <label className={styles.checkboxLabel}>
+                <input
+                  type="checkbox"
+                  checked={hideAllInitially}
+                  onChange={e => setHideAllInitially(e.target.checked)}
+                  className={styles.checkbox}
+                />
+                <span className={styles.checkboxText}>Hide all tables on first load</span>
+              </label>
+
+              {testResult !== 'idle' && (
+                <div className={`${styles.testBanner} ${testResult === 'ok' ? styles.testBannerOk : styles.testBannerError}`}>
+                  {testResult === 'ok' ? (
+                    <>
+                      <CheckCircle2 size={15} strokeWidth={2.2} />
+                      Connection succeeded
+                    </>
+                  ) : (
+                    <>
+                      <XCircle size={15} strokeWidth={2.2} />
+                      {testError}
+                    </>
+                  )}
+                </div>
+              )}
+
+              <div className={styles.actionRow}>
+                <button
+                  onClick={handleTest}
+                  disabled={!connStr}
+                  className={`${styles.actionButton} ${styles.testButton} ${!connStr ? styles.actionButtonDisabled : ''} ${testResult === 'ok' ? styles.testButtonOk : ''} ${testResult === 'error' ? styles.testButtonError : ''}`}
+                >
+                  <Database size={14} strokeWidth={2.2} />
+                  {testLabel}
+                </button>
+                <button
+                  onClick={() => saveMutation.mutate()}
+                  disabled={!name || !connStr || saveMutation.isPending}
+                  className={`${styles.actionButton} ${styles.saveButton} ${name && connStr ? styles.saveButtonEnabled : styles.actionButtonDisabled}`}
+                >
+                  {saveMutation.isPending
+                    ? (testResult === 'ok' ? (editingName ? 'Saving...' : 'Adding...') : 'Testing...')
+                    : (
+                      <>
+                        <Plus size={14} strokeWidth={2.2} />
+                        {editingName ? 'Save changes' : 'Add connection'}
+                      </>
+                    )}
+                </button>
+              </div>
             </div>
-          )}
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button
-              onClick={handleTest}
-              disabled={!connStr}
-              style={{
-                padding: '8px 14px', borderRadius: 'var(--r-sm)',
-                border: '1px solid var(--border-strong)',
-                background: 'var(--bg)', fontFamily: 'inherit', fontSize: 13, fontWeight: 600,
-                cursor: connStr ? 'pointer' : 'not-allowed',
-                color: testResult === 'ok' ? 'var(--ok-color)' : testResult === 'error' ? 'var(--err-color)' : 'var(--text-2)',
-              }}
-            >
-              {testResult === 'ok' ? '✓ Connected' : testResult === 'error' ? '✗ Failed' : 'Test'}
-            </button>
-            <button
-              onClick={() => saveMutation.mutate()}
-              disabled={!name || !connStr || saveMutation.isPending}
-              style={{
-                flex: 1, padding: '8px 14px', borderRadius: 'var(--r-sm)',
-                background: name && connStr ? 'var(--accent-grad)' : 'rgba(255,255,255,0.1)',
-                border: 'none', color: 'white', cursor: name && connStr ? 'pointer' : 'not-allowed',
-                fontFamily: 'inherit', fontSize: 13, fontWeight: 700,
-              }}
-            >
-              {saveMutation.isPending
-                ? (testResult === 'ok' ? (editingName ? 'Saving…' : 'Adding…') : 'Testing…')
-                : (editingName ? 'Save Changes' : 'Add Connection')}
-            </button>
-          </div>
+          </section>
         </div>
       </div>
     </div>
   )
-}
-
-const inputStyle: React.CSSProperties = {
-  padding: '8px 12px',
-  background: 'var(--bg)',
-  border: '1px solid var(--border-strong)',
-  borderRadius: 'var(--r-sm)',
-  color: 'var(--text-1)',
-  fontFamily: 'inherit',
-  fontSize: 13,
-  outline: 'none',
-  width: '100%',
 }
