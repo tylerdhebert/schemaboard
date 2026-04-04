@@ -90,7 +90,7 @@ export function Header({
     ? currentWorkspaceName
       ? (isWorkspaceDirty ? 'Unsaved changes' : workspaceLabel)
       : workspaceLabel
-    : 'Pick a live connection or enter demo mode'
+    : 'Select a source to load a schema'
 
   useEffect(() => {
     function handlePointerDown(event: MouseEvent) {
@@ -131,9 +131,11 @@ export function Header({
           </div>
 
           <div className={styles.statusPill}>
-            <span className={`${styles.modePill} ${isDemoMode ? styles.modePillDemo : styles.modePillLive}`}>
-              {isDemoMode ? 'Demo' : 'Live'}
-            </span>
+            {hasActiveSource && (
+              <span className={`${styles.modePill} ${isDemoMode ? styles.modePillDemo : styles.modePillLive}`}>
+                {isDemoMode ? 'Demo' : 'Live'}
+              </span>
+            )}
             <div className={styles.statusText}>
               <div className={styles.statusTitle}>{sourceLabel}</div>
               <div className={styles.statusMeta}>{statusDetail}</div>

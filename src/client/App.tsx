@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Check, ChevronDown, Copy, EyeOff, FolderMinus, FolderPlus, Layers3, Maximize2, Plus, X } from 'lucide-react'
 import { api } from './api/client'
-import { generateCondensed, generateDDL } from './lib/context-generator'
 import { Canvas } from './components/Canvas'
 import { ContextPanel } from './components/ContextPanel'
 import { GroupModal } from './components/GroupModal'
@@ -10,6 +9,7 @@ import { Header } from './components/Header'
 import { SchemaDiffModal } from './components/SchemaDiffModal'
 import { Sidebar } from './components/Sidebar'
 import { WorkspaceModal } from './components/WorkspaceModal'
+import { tableNameFromId, useSelectionContext } from './hooks/useSelectionContext'
 import { useStore, workspaceStatesEqual } from './store'
 import type { Connection, Group, SchemaData, Workspace } from '../types'
 import styles from './App.module.css'
@@ -21,10 +21,6 @@ const MIN_SIDEBAR_WIDTH = 240
 const MAX_SIDEBAR_WIDTH = 520
 const MIN_CONTEXT_PANEL_WIDTH = 260
 const MAX_CONTEXT_PANEL_WIDTH = 520
-
-function tableNameFromId(tableId: string): string {
-  return tableId.split('.').slice(1).join('.')
-}
 
 function ContextMenuAction({
   icon,
@@ -319,14 +315,18 @@ export function App() {
     setShowWorkspaceModal(true)
   }, [currentWorkspace])
 
+  const {
+    contextText: selectionContextText,
+    selectedTableData,
+    selectedTableIds,
+    selectedTableNames,
+    selectedTables: selectedTableSet,
+  } = useSelectionContext(schemaData)
+
   const ctxMenuTableName = ctxMenu ? tableNameFromId(ctxMenu.tableId) : null
   const ctxMenuGroups = ctxMenuTableName
     ? (groups as Group[]).filter(group => group.tables.includes(ctxMenuTableName))
     : []
-  const selectedTableNames = useMemo(
-    () => [...selectedTables].map(tableNameFromId),
-    [selectedTables]
-  )
   const ctxMenuSelectedTableNames = ctxMenu && selectedTables.has(ctxMenu.tableId) && selectedTableNames.length > 1
     ? selectedTableNames
     : []
@@ -335,22 +335,6 @@ export function App() {
     [groups, ctxMenuGroups]
   )
   const ctxMenuSummary = `${ctxMenuGroups.length} group${ctxMenuGroups.length === 1 ? '' : 's'}`
-  const selectedTableIds = useMemo(() => [...selectedTables], [selectedTables])
-  const selectedTableData = useMemo(
-    () => schemaData.tables.filter(table => selectedTables.has(`${table.schema}.${table.name}`)),
-    [schemaData.tables, selectedTables]
-  )
-  const selectionRelevantFKs = useMemo(() => {
-    const names = new Set(selectedTableData.map(table => table.name))
-    return schemaData.foreignKeys.filter(fk => names.has(fk.parentTable))
-  }, [schemaData.foreignKeys, selectedTableData])
-  const selectionContextText = useMemo(() => {
-    if (selectedTableData.length === 0) return ''
-    return format === 'condensed'
-      ? generateCondensed(selectedTableData, selectionRelevantFKs)
-      : generateDDL(selectedTableData, selectionRelevantFKs)
-  }, [selectedTableData, selectionRelevantFKs, format])
-
   useEffect(() => {
     window.localStorage.setItem('schemaboard:left-sidebar-width', String(leftSidebarWidth))
   }, [leftSidebarWidth])
@@ -466,16 +450,16 @@ export function App() {
             <Canvas schemaData={schemaData} groups={groups as Group[]} />
           ) : (
             <div className={styles.emptyState}>
-              Select a live connection or enable Demo Mode to load a schema
+              Select a source to load a schema
             </div>
           )}
 
-          {selectedTables.size > 0 && (
+          {selectedTableSet.size > 0 && (
             <div className={styles.selectionBar}>
               <div className={styles.selectionSummary}>
-                <span className={styles.selectionCount}>{selectedTables.size}</span>
+                <span className={styles.selectionCount}>{selectedTableSet.size}</span>
                 <div className={styles.selectionCopy}>
-                  <span className={styles.selectionLabel}>table{selectedTables.size > 1 ? 's' : ''} selected</span>
+                  <span className={styles.selectionLabel}>table{selectedTableSet.size > 1 ? 's' : ''} selected</span>
                   <span className={styles.selectionMeta}>Quick actions for the current selection</span>
                 </div>
               </div>
@@ -537,7 +521,7 @@ export function App() {
             </div>
           )}
 
-          {selectionMenu && selectedTables.size > 0 && (
+          {selectionMenu && selectedTableSet.size > 0 && (
             <div
               className={styles.menu}
               style={{ left: selectionMenu.x, top: selectionMenu.y }}
@@ -545,7 +529,7 @@ export function App() {
             >
               <div className={styles.menuHeader}>
                 <div className={styles.menuEyebrow}>Selection</div>
-                <div className={styles.menuTitle}>{selectedTables.size} table{selectedTables.size === 1 ? '' : 's'}</div>
+                <div className={styles.menuTitle}>{selectedTableSet.size} table{selectedTableSet.size === 1 ? '' : 's'}</div>
                 <div className={styles.menuMeta}>Group the current selection</div>
               </div>
               <ContextMenuAction
@@ -570,7 +554,7 @@ export function App() {
                   <div className={styles.menuSwatch} style={{ background: group.color }} />
                   <span className={styles.menuGroupName}>{group.name}</span>
                   <span className={styles.menuGroupMeta}>
-                    <span className={styles.menuGroupCount}>{selectedTables.size}</span>
+                      <span className={styles.menuGroupCount}>{selectedTableSet.size}</span>
                     <span className={styles.menuGroupBadge}>
                       <Plus size={11} strokeWidth={2.4} />
                     </span>

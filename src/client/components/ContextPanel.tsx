@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from '../store'
-import { generateCondensed, generateDDL } from '../lib/context-generator'
+import { useSelectionContext } from '../hooks/useSelectionContext'
 import { estimateTokens } from '../lib/token-estimate'
 import type { SchemaData } from '../../types'
 import styles from './ContextPanel.module.css'
@@ -10,28 +10,12 @@ interface ContextPanelProps {
 }
 
 export function ContextPanel({ schemaData }: ContextPanelProps) {
-  const { selectedTables, format, setFormat } = useStore()
+  const { format, setFormat } = useStore()
   const [copied, setCopied] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [editedText, setEditedText] = useState('')
   const [savedText, setSavedText] = useState<string | null>(null)
-
-  const selectedTableData = useMemo(
-    () => schemaData.tables.filter(table => selectedTables.has(`${table.schema}.${table.name}`)),
-    [schemaData.tables, selectedTables]
-  )
-
-  const relevantFKs = useMemo(() => {
-    const names = new Set(selectedTableData.map(table => table.name))
-    return schemaData.foreignKeys.filter(fk => names.has(fk.parentTable))
-  }, [schemaData.foreignKeys, selectedTableData])
-
-  const contextText = useMemo(() => {
-    if (selectedTableData.length === 0) return ''
-    return format === 'condensed'
-      ? generateCondensed(selectedTableData, relevantFKs)
-      : generateDDL(selectedTableData, relevantFKs)
-  }, [selectedTableData, relevantFKs, format])
+  const { contextText, selectedTables } = useSelectionContext(schemaData)
 
   const isEditingRef = useRef(isEditing)
   useEffect(() => { isEditingRef.current = isEditing }, [isEditing])

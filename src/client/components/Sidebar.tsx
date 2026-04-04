@@ -1,8 +1,12 @@
+import { GripVertical } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Check, ChevronDown, ChevronRight, Copy, Eye, EyeOff, FolderMinus, FolderPlus, GripVertical, Layers3, Maximize2, PencilLine, Plus, X } from 'lucide-react'
 import { useStore } from '../store'
-import { generateCondensed, generateDDL } from '../lib/context-generator'
+import { tableNameFromId, useSelectionContext } from '../hooks/useSelectionContext'
 import type { Group, SchemaData, SchemaTable } from '../../types'
+import { SidebarGroupList } from './sidebar/SidebarGroupList'
+import { SidebarMenus } from './sidebar/SidebarMenus'
+import { SidebarSelectionCard } from './sidebar/SidebarSelectionCard'
+import { arraysEqual, reorderList, tableIdFromTable, type DragItem, type DragTarget, type DropPosition } from './sidebar/shared'
 import styles from './Sidebar.module.css'
 
 interface SidebarProps {
@@ -15,36 +19,6 @@ interface SidebarProps {
   onUnassignTable: (tableId: string, groupId?: string) => void
   onReorderGroups: (groupIds: string[]) => void
   onReorderGroupTables: (groupId: string, tableIds: string[]) => void
-}
-
-type DropPosition = 'before' | 'after'
-type DragItem = { type: 'group'; groupId: string } | { type: 'group-table'; groupId: string; tableId: string } | { type: 'ungrouped-table'; tableId: string }
-type DragTarget = { type: 'group'; groupId: string; position: DropPosition } | { type: 'group-table'; groupId: string; tableId: string; position: DropPosition } | { type: 'ungrouped-table'; tableId: string; position: DropPosition }
-
-function tableIdFromTable(table: SchemaTable): string { return `${table.schema}.${table.name}` }
-function tableNameFromId(tableId: string): string { return tableId.split('.').slice(1).join('.') }
-function arraysEqual(left: string[], right: string[]): boolean { return left.length === right.length && left.every((v, i) => v === right[i]) }
-function reorderList(items: string[], draggedId: string, targetId: string, position: DropPosition): string[] {
-  if (draggedId === targetId) return items
-  const withoutDragged = items.filter(item => item !== draggedId)
-  const targetIndex = withoutDragged.indexOf(targetId)
-  if (targetIndex === -1) return items
-  const next = [...withoutDragged]
-  next.splice(position === 'before' ? targetIndex : targetIndex + 1, 0, draggedId)
-  return next
-}
-
-function MenuHeader({ eyebrow, title, meta }: { eyebrow: string; title: string; meta?: string }) {
-  return <div className={styles.menuHeader}><div className={styles.menuEyebrow}>{eyebrow}</div><div className={styles.menuTitle}>{title}</div>{meta && <div className={styles.menuMeta}>{meta}</div>}</div>
-}
-
-function MenuAction({ icon, label, meta, onClick, tone = 'default' }: { icon: React.ReactNode; label: string; meta?: string; onClick: () => void; tone?: 'default' | 'danger' }) {
-  return (
-    <button type="button" className={`${styles.menuAction} ${tone === 'danger' ? styles.menuActionDanger : ''}`} onClick={onClick}>
-      <span className={styles.menuActionIcon}>{icon}</span>
-      <span className={styles.menuActionBody}><span className={styles.menuActionLabel}>{label}</span>{meta && <span className={styles.menuActionMeta}>{meta}</span>}</span>
-    </button>
-  )
 }
 
 export function Sidebar({
@@ -70,7 +44,28 @@ export function Sidebar({
   const [dragTarget, setDragTarget] = useState<DragTarget | null>(null)
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const { clearSelection, format, deselectTables, hiddenGroups, hiddenTables, selectedTables, selectTables, setFitToNodes, setHiddenTables, setSearchQuery, setZoomToTable, toggleGroupVisibility, toggleTable, toggleTableVisibility } = useStore()
+  const {
+    clearSelection,
+    deselectTables,
+    hiddenGroups,
+    hiddenTables,
+    selectedTables,
+    selectTables,
+    setFitToNodes,
+    setHiddenTables,
+    setSearchQuery,
+    setZoomToTable,
+    toggleGroupVisibility,
+    toggleTable,
+    toggleTableVisibility,
+  } = useStore()
+
+  const {
+    contextText: selectionContextText,
+    selectedTableIds,
+    selectedTableNames,
+    selectedTables: selectedTableSet,
+  } = useSelectionContext(schemaData)
 
   function handleSearch(value: string) {
     setSearch(value)
@@ -80,7 +75,11 @@ export function Sidebar({
 
   useEffect(() => {
     if (!ctxMenu && !groupCtxMenu && !selectionMenu) return
-    const close = () => { setCtxMenu(null); setGroupCtxMenu(null); setSelectionMenu(null) }
+    const close = () => {
+      setCtxMenu(null)
+      setGroupCtxMenu(null)
+      setSelectionMenu(null)
+    }
     window.addEventListener('click', close)
     return () => window.removeEventListener('click', close)
   }, [ctxMenu, groupCtxMenu, selectionMenu])
@@ -103,29 +102,38 @@ export function Sidebar({
     return map
   }, [groups])
 
-  const tableByName = useMemo(() => new Map(schemaData.tables.map(table => [table.name, table])), [schemaData.tables])
+  const tableByName = useMemo(
+    () => new Map(schemaData.tables.map(table => [table.name, table])),
+    [schemaData.tables]
+  )
 
-  const filtered = useMemo(() => {
+  const filteredTables = useMemo(() => {
     const query = search.toLowerCase()
     if (!query) return schemaData.tables
-    return schemaData.tables.filter(table => table.name.toLowerCase().includes(query) || table.columns.some(column => column.name.toLowerCase().includes(query)))
+    return schemaData.tables.filter(table =>
+      table.name.toLowerCase().includes(query) ||
+      table.columns.some(column => column.name.toLowerCase().includes(query))
+    )
   }, [schemaData.tables, search])
 
   const columnMatches = useMemo(() => {
     const query = search.toLowerCase()
     if (!query) return new Map<string, string[]>()
+
     const map = new Map<string, string[]>()
-    for (const table of filtered) {
+    for (const table of filteredTables) {
       if (table.name.toLowerCase().includes(query)) continue
-      const cols = table.columns.filter(column => column.name.toLowerCase().includes(query)).map(column => column.name)
+      const cols = table.columns
+        .filter(column => column.name.toLowerCase().includes(query))
+        .map(column => column.name)
       if (cols.length) map.set(table.name, cols)
     }
     return map
-  }, [filtered, search])
+  }, [filteredTables, search])
 
   const tablesByGroup = useMemo(() => {
     const map = new Map<string, SchemaTable[]>()
-    for (const table of filtered) {
+    for (const table of filteredTables) {
       const tableGroups = tableToGroups.get(table.name)
       if (!tableGroups) continue
       for (const group of tableGroups) {
@@ -134,9 +142,12 @@ export function Sidebar({
       }
     }
     return map
-  }, [filtered, tableToGroups])
+  }, [filteredTables, tableToGroups])
 
-  const ungroupedTables = useMemo(() => filtered.filter(table => !tableToGroups.has(table.name)), [filtered, tableToGroups])
+  const ungroupedTables = useMemo(
+    () => filteredTables.filter(table => !tableToGroups.has(table.name)),
+    [filteredTables, tableToGroups]
+  )
 
   useEffect(() => {
     const nextIds = ungroupedTables.map(tableIdFromTable)
@@ -150,25 +161,43 @@ export function Sidebar({
 
   const orderedUngroupedTables = useMemo(() => {
     const tableMap = new Map(ungroupedTables.map(table => [tableIdFromTable(table), table]))
-    return ungroupedOrder.map(id => tableMap.get(id)).filter((table): table is SchemaTable => table != null)
+    return ungroupedOrder
+      .map(id => tableMap.get(id))
+      .filter((table): table is SchemaTable => table != null)
   }, [ungroupedTables, ungroupedOrder])
 
   const visibleTableOrder = useMemo(() => {
     const ids: string[] = []
+
     for (const group of groups) {
-      const groupTables = search ? tablesByGroup.get(group.id) ?? [] : group.tables.map(name => tableByName.get(name)).filter((table): table is SchemaTable => table != null)
+      const groupTables = search
+        ? tablesByGroup.get(group.id) ?? []
+        : group.tables
+            .map(name => tableByName.get(name))
+            .filter((table): table is SchemaTable => table != null)
+
       if (!expandedGroups.has(group.id)) continue
       for (const table of groupTables) ids.push(tableIdFromTable(table))
     }
+
     for (const table of orderedUngroupedTables) ids.push(tableIdFromTable(table))
     return ids
-  }, [groups, search, tablesByGroup, tableByName, expandedGroups, orderedUngroupedTables])
+  }, [expandedGroups, groups, orderedUngroupedTables, search, tableByName, tablesByGroup])
 
   const allExpanded = groups.length > 0 && groups.every(group => expandedGroups.has(group.id))
   const canDragReorder = search.trim().length === 0
 
-  function toggleExpandAll() { setExpandedGroups(allExpanded ? new Set() : new Set(groups.map(group => group.id))) }
-  function toggleGroupExpand(groupId: string) { setExpandedGroups(prev => { const next = new Set(prev); next.has(groupId) ? next.delete(groupId) : next.add(groupId); return next }) }
+  function toggleExpandAll() {
+    setExpandedGroups(allExpanded ? new Set() : new Set(groups.map(group => group.id)))
+  }
+
+  function toggleGroupExpand(groupId: string) {
+    setExpandedGroups(prev => {
+      const next = new Set(prev)
+      next.has(groupId) ? next.delete(groupId) : next.add(groupId)
+      return next
+    })
+  }
 
   function handleTableClick(event: React.MouseEvent<HTMLDivElement>, nodeId: string) {
     if (event.shiftKey && selectionAnchorId) {
@@ -179,18 +208,31 @@ export function Sidebar({
         const rangeIds = visibleTableOrder.slice(from, to + 1)
         const anchorSelected = selectedTables.has(selectionAnchorId)
         const targetSelected = selectedTables.has(nodeId)
-        if (anchorSelected && targetSelected && rangeIds.every(id => selectedTables.has(id))) deselectTables(rangeIds)
-        else selectTables(rangeIds)
+        if (anchorSelected && targetSelected && rangeIds.every(id => selectedTables.has(id))) {
+          deselectTables(rangeIds)
+        } else {
+          selectTables(rangeIds)
+        }
         setSelectionAnchorId(nodeId)
         return
       }
     }
+
     toggleTable(nodeId)
     setSelectionAnchorId(nodeId)
   }
 
-  function beginDrag(item: DragItem) { if (!canDragReorder) return; setDragItem(item); setDragTarget(null) }
-  function clearDragState() { setDragItem(null); setDragTarget(null) }
+  function beginDrag(item: DragItem) {
+    if (!canDragReorder) return
+    setDragItem(item)
+    setDragTarget(null)
+  }
+
+  function clearDragState() {
+    setDragItem(null)
+    setDragTarget(null)
+  }
+
   function updateDropPosition(event: React.DragEvent<HTMLElement>, nextTarget: DragTarget) {
     event.preventDefault()
     event.stopPropagation()
@@ -200,31 +242,49 @@ export function Sidebar({
   function handleGroupDrop(groupId: string) {
     if (!dragItem || dragItem.type !== 'group') return
     if (!dragTarget || dragTarget.type !== 'group' || dragTarget.groupId !== groupId) return
+
     const currentOrder = groups.map(group => group.id)
     const nextOrder = reorderList(currentOrder, dragItem.groupId, groupId, dragTarget.position)
-    if (!arraysEqual(nextOrder, currentOrder)) onReorderGroups(nextOrder)
+    if (!arraysEqual(nextOrder, currentOrder)) {
+      onReorderGroups(nextOrder)
+    }
     clearDragState()
   }
 
   function handleGroupTableDrop(groupId: string, targetTableId: string) {
     if (!dragItem || dragItem.type !== 'group-table' || dragItem.groupId !== groupId) return
     if (!dragTarget || dragTarget.type !== 'group-table' || dragTarget.groupId !== groupId || dragTarget.tableId !== targetTableId) return
+
     const group = groups.find(item => item.id === groupId)
-    if (!group) return clearDragState()
-    const currentOrder = group.tables.map(name => tableByName.get(name)).filter((table): table is SchemaTable => table != null).map(tableIdFromTable)
+    if (!group) {
+      clearDragState()
+      return
+    }
+
+    const currentOrder = group.tables
+      .map(name => tableByName.get(name))
+      .filter((table): table is SchemaTable => table != null)
+      .map(tableIdFromTable)
     const nextOrder = reorderList(currentOrder, dragItem.tableId, targetTableId, dragTarget.position)
-    if (!arraysEqual(nextOrder, currentOrder)) onReorderGroupTables(groupId, nextOrder)
+    if (!arraysEqual(nextOrder, currentOrder)) {
+      onReorderGroupTables(groupId, nextOrder)
+    }
     clearDragState()
   }
 
   function handleUngroupedDrop(targetTableId: string) {
     if (!dragItem || dragItem.type !== 'ungrouped-table') return
     if (!dragTarget || dragTarget.type !== 'ungrouped-table' || dragTarget.tableId !== targetTableId) return
+
     setUngroupedOrder(current => reorderList(current, dragItem.tableId, targetTableId, dragTarget.position))
     clearDragState()
   }
 
-  function renderDragHandle(label: string, disabled: boolean, onDragStart: (event: React.DragEvent<HTMLButtonElement>) => void) {
+  function renderDragHandle(
+    label: string,
+    disabled: boolean,
+    onDragStart: (event: React.DragEvent<HTMLButtonElement>) => void
+  ) {
     return (
       <button
         type="button"
@@ -233,7 +293,10 @@ export function Sidebar({
         onClick={event => event.stopPropagation()}
         onMouseDown={event => event.stopPropagation()}
         onDragStart={event => {
-          if (disabled) return event.preventDefault()
+          if (disabled) {
+            event.preventDefault()
+            return
+          }
           onDragStart(event)
           event.dataTransfer.effectAllowed = 'move'
           event.dataTransfer.setData('text/plain', label)
@@ -309,21 +372,6 @@ export function Sidebar({
     )
   }
 
-  const ctxMenuTableName = ctxMenu ? tableNameFromId(ctxMenu.nodeId) : null
-  const ctxMenuGroups = ctxMenuTableName ? tableToGroups.get(ctxMenuTableName) ?? [] : []
-  const assignableGroups = groups.filter(group => !ctxMenuGroups.some(item => item.id === group.id))
-  const selectedTableIds = useMemo(() => [...selectedTables], [selectedTables])
-  const selectedTableNames = useMemo(() => selectedTableIds.map(tableNameFromId), [selectedTableIds])
-  const selectedTableData = useMemo(() => schemaData.tables.filter(table => selectedTables.has(tableIdFromTable(table))), [schemaData.tables, selectedTables])
-  const selectionRelevantFKs = useMemo(() => {
-    const names = new Set(selectedTableData.map(table => table.name))
-    return schemaData.foreignKeys.filter(fk => names.has(fk.parentTable))
-  }, [schemaData.foreignKeys, selectedTableData])
-  const selectionContextText = useMemo(() => {
-    if (selectedTableData.length === 0) return ''
-    return format === 'condensed' ? generateCondensed(selectedTableData, selectionRelevantFKs) : generateDDL(selectedTableData, selectionRelevantFKs)
-  }, [selectedTableData, selectionRelevantFKs, format])
-
   async function handleCopySelectionContext(event: React.MouseEvent<HTMLButtonElement>) {
     event.stopPropagation()
     if (!selectionContextText) return
@@ -331,157 +379,106 @@ export function Sidebar({
     setCopiedSelectionContext(true)
   }
 
+  function zoomToGroup(groupId: string) {
+    const group = groups.find(item => item.id === groupId)
+    if (!group) return
+    const ids = group.tables
+      .map(name => tableByName.get(name))
+      .filter((table): table is SchemaTable => table != null)
+      .map(tableIdFromTable)
+    if (ids.length > 0) setFitToNodes(ids)
+  }
+
   return (
     <aside className={styles.sidebar}>
       <div className={styles.searchWrap}>
-        <input value={search} onChange={event => handleSearch(event.target.value)} placeholder="Search tables and columns..." className={styles.searchInput} />
+        <input
+          value={search}
+          onChange={event => handleSearch(event.target.value)}
+          placeholder="Search tables and columns..."
+          className={styles.searchInput}
+        />
       </div>
 
-      <div className={styles.selectionSlot}>
-        <div className={`${styles.selectionToolbar} ${selectedTables.size === 0 ? styles.selectionToolbarIdle : ''}`}>
-          <div className={styles.selectionToolbarHeader}>
-            <div className={styles.selectionToolbarSummary}>
-              <span className={styles.selectionToolbarCount}>{selectedTables.size}</span>
-              <div className={styles.selectionToolbarCopy}>
-                <span className={styles.selectionToolbarEyebrow}>Selection</span>
-                <span className={styles.selectionToolbarLabel}>{selectedTables.size > 0 ? `${selectedTables.size} table${selectedTables.size === 1 ? '' : 's'} selected` : 'No tables selected'}</span>
-              </div>
-            </div>
-            <button type="button" disabled={selectedTables.size === 0} className={`${styles.selectionToolbarButton} ${styles.selectionToolbarButtonMuted} ${selectedTables.size === 0 ? styles.selectionToolbarButtonDisabled : ''}`} onClick={event => { event.stopPropagation(); clearSelection() }} title="Clear selection">
-              <X size={12} strokeWidth={2.2} />
-            </button>
-          </div>
-          <div className={styles.selectionToolbarActions}>
-            <button type="button" disabled={selectedTables.size === 0} className={`${styles.selectionToolbarButton} ${selectedTables.size === 0 ? styles.selectionToolbarButtonDisabled : ''}`} onClick={event => { event.stopPropagation(); setFitToNodes(selectedTableIds) }}>
-              <Maximize2 size={12} strokeWidth={2.2} />Zoom
-            </button>
-            <button type="button" disabled={selectedTables.size === 0} className={`${styles.selectionToolbarButton} ${styles.selectionToolbarButtonPrimary} ${selectedTables.size === 0 ? styles.selectionToolbarButtonDisabled : ''}`} onClick={event => { event.stopPropagation(); const rect = event.currentTarget.getBoundingClientRect(); setSelectionMenu(current => current ? null : { x: rect.left, y: rect.bottom + 8 }) }}>
-              <FolderPlus size={12} strokeWidth={2.2} />Group<ChevronDown size={11} strokeWidth={2.4} />
-            </button>
-            <button type="button" disabled={selectedTables.size === 0} className={`${styles.selectionToolbarButton} ${selectedTables.size === 0 ? styles.selectionToolbarButtonDisabled : ''}`} onClick={handleCopySelectionContext}>
-              {copiedSelectionContext ? <Check size={12} strokeWidth={2.4} /> : <Copy size={12} strokeWidth={2.2} />}{copiedSelectionContext ? 'Copied' : 'Copy context'}
-            </button>
-            <button type="button" disabled={selectedTables.size === 0} className={`${styles.selectionToolbarButton} ${selectedTables.size === 0 ? styles.selectionToolbarButtonDisabled : ''}`} onClick={event => { event.stopPropagation(); selectedTableIds.forEach(id => toggleTableVisibility(id)); clearSelection() }}>
-              <EyeOff size={12} strokeWidth={2.2} />Hide
-            </button>
-          </div>
-        </div>
-      </div>
+      <SidebarSelectionCard
+        selectedCount={selectedTableSet.size}
+        selectedTableIds={selectedTableIds}
+        copied={copiedSelectionContext}
+        onClear={clearSelection}
+        onZoom={setFitToNodes}
+        onOpenGroupMenu={rect => setSelectionMenu({ x: rect.left, y: rect.bottom + 8 })}
+        onCopy={handleCopySelectionContext}
+        onHide={ids => {
+          ids.forEach(id => toggleTableVisibility(id))
+          clearSelection()
+        }}
+      />
 
       <div className={styles.sectionLabel}>Groups</div>
       <div className={styles.toolbar}>
-        <button type="button" className={`${styles.toolbarButton} ${allExpanded ? styles.toolbarButtonActive : ''}`} onClick={toggleExpandAll}>{allExpanded ? 'Collapse groups' : 'Expand groups'}</button>
-        <button type="button" className={`${styles.toolbarButton} ${styles.toolbarButtonPrimary}`} onClick={() => onOpenGroupModal()}><FolderPlus size={13} strokeWidth={2.2} />New group</button>
+        <button type="button" className={`${styles.toolbarButton} ${allExpanded ? styles.toolbarButtonActive : ''}`} onClick={toggleExpandAll}>
+          {allExpanded ? 'Collapse groups' : 'Expand groups'}
+        </button>
+        <button type="button" className={`${styles.toolbarButton} ${styles.toolbarButtonPrimary}`} onClick={() => onOpenGroupModal()}>
+          New group
+        </button>
       </div>
 
-      {hiddenTables.size > 0 && <div className={styles.showHiddenWrap}><button className={styles.showHiddenButton} onClick={() => setHiddenTables([])}>Show hidden tables ({hiddenTables.size})</button></div>}
+      {hiddenTables.size > 0 && (
+        <div className={styles.showHiddenWrap}>
+          <button className={styles.showHiddenButton} onClick={() => setHiddenTables([])}>
+            Show hidden tables ({hiddenTables.size})
+          </button>
+        </div>
+      )}
 
       <div className={styles.content}>
-        {selectionMenu && selectedTables.size > 0 && (
-          <div className={`${styles.menu} ${styles.tableMenu}`} style={{ left: selectionMenu.x, top: selectionMenu.y }} onClick={event => event.stopPropagation()}>
-            <MenuHeader eyebrow="Selection" title={`${selectedTables.size} table${selectedTables.size === 1 ? '' : 's'}`} meta="Group the current selection" />
-            <MenuAction icon={<Layers3 size={14} strokeWidth={2.1} />} label="Add to new group" meta="Create one group from all selected tables" onClick={() => { onOpenGroupModal(null, null, selectedTableNames); setSelectionMenu(null) }} />
-            <div className={styles.menuSectionLabel}><span>Add to existing group</span></div>
-            {groups.length === 0 && <div className={styles.menuEmpty}>No groups yet</div>}
-            {groups.map(group => (
-              <button key={group.id} type="button" className={styles.menuGroupItem} onClick={() => { onAssignTablesToGroup(selectedTableIds, group.id); setSelectionMenu(null) }}>
-                <div className={styles.menuSwatch} style={{ background: group.color }} />
-                <span className={styles.menuGroupName}>{group.name}</span>
-                <span className={styles.menuGroupMeta}><span className={styles.menuGroupBadge}><Plus size={11} strokeWidth={2.4} /></span></span>
-              </button>
-            ))}
-          </div>
-        )}
+        <SidebarMenus
+          groups={groups}
+          tableByName={tableByName}
+          ctxMenu={ctxMenu}
+          groupCtxMenu={groupCtxMenu}
+          selectionMenu={selectionMenu}
+          hiddenTables={hiddenTables}
+          selectedCount={selectedTableSet.size}
+          selectedTableIds={selectedTableIds}
+          selectedTableNames={selectedTableNames}
+          tableToGroups={tableToGroups}
+          onCloseTableMenu={() => setCtxMenu(null)}
+          onCloseGroupMenu={() => setGroupCtxMenu(null)}
+          onCloseSelectionMenu={() => setSelectionMenu(null)}
+          onZoomToTable={setZoomToTable}
+          onToggleTableVisibility={toggleTableVisibility}
+          onUnassignTable={onUnassignTable}
+          onOpenGroupModal={onOpenGroupModal}
+          onAssignTableToGroup={onAssignTableToGroup}
+          onAssignTablesToGroup={onAssignTablesToGroup}
+          onZoomToGroup={zoomToGroup}
+        />
 
-        {ctxMenu && (
-          <div className={`${styles.menu} ${styles.tableMenu}`} style={{ left: ctxMenu.x, top: ctxMenu.y }} onClick={event => event.stopPropagation()}>
-            <MenuHeader eyebrow="Table" title={ctxMenuTableName ?? 'Table actions'} meta={`${ctxMenuGroups.length} group${ctxMenuGroups.length === 1 ? '' : 's'}`} />
-            <MenuAction icon={<Maximize2 size={14} strokeWidth={2.1} />} label="Zoom to table" meta="Center this table on the board" onClick={() => { setZoomToTable(ctxMenu.nodeId); setCtxMenu(null) }} />
-            <MenuAction icon={hiddenTables.has(ctxMenu.nodeId) ? <Eye size={14} strokeWidth={2.1} /> : <EyeOff size={14} strokeWidth={2.1} />} label={hiddenTables.has(ctxMenu.nodeId) ? 'Show table' : 'Hide table'} meta={hiddenTables.has(ctxMenu.nodeId) ? 'Bring it back into view' : 'Hide it from the board'} onClick={() => { toggleTableVisibility(ctxMenu.nodeId); setCtxMenu(null) }} />
-            {ctxMenuGroups.map(group => <MenuAction key={group.id} icon={<FolderMinus size={14} strokeWidth={2.1} />} label={`Remove from ${group.name}`} meta="Unassign from this group" onClick={() => { onUnassignTable(ctxMenu.nodeId, group.id); setCtxMenu(null) }} tone="danger" />)}
-            <div className={styles.menuDivider} />
-            <MenuAction icon={<FolderPlus size={14} strokeWidth={2.1} />} label="Add to new group" meta="Create a new group from this table" onClick={() => { onOpenGroupModal(ctxMenuTableName); setCtxMenu(null) }} />
-            <div className={styles.menuSectionLabel}><span>Assign to group</span></div>
-            {assignableGroups.length === 0 && <div className={styles.menuEmpty}>No other groups</div>}
-            {assignableGroups.map(group => (
-              <button key={group.id} type="button" className={styles.menuGroupItem} onClick={() => { onAssignTableToGroup(ctxMenu.nodeId, group.id); setCtxMenu(null) }}>
-                <div className={styles.menuSwatch} style={{ background: group.color }} />
-                <span className={styles.menuGroupName}>{group.name}</span>
-                <span className={styles.menuGroupBadge}><Plus size={11} strokeWidth={2.4} /></span>
-              </button>
-            ))}
-          </div>
-        )}
-
-        {groupCtxMenu && (() => {
-          const group = groups.find(item => item.id === groupCtxMenu.groupId)
-          if (!group) return null
-          return (
-            <div className={`${styles.menu} ${styles.groupMenu}`} style={{ left: groupCtxMenu.x, top: groupCtxMenu.y }} onClick={event => event.stopPropagation()}>
-              <MenuHeader eyebrow="Group" title={group.name} meta={`${group.tables.length} table${group.tables.length === 1 ? '' : 's'}`} />
-              <MenuAction icon={<Maximize2 size={14} strokeWidth={2.1} />} label="Zoom to group" meta="Fit all group tables on the board" onClick={() => {
-                const ids = group.tables.map(name => tableByName.get(name)).filter((table): table is SchemaTable => table != null).map(tableIdFromTable)
-                if (ids.length > 0) setFitToNodes(ids)
-                setGroupCtxMenu(null)
-              }} />
-              <MenuAction icon={<PencilLine size={14} strokeWidth={2.1} />} label="Edit group" meta="Rename or recolor this group" onClick={() => { onOpenGroupModal(null, group.id); setGroupCtxMenu(null) }} />
-            </div>
-          )
-        })()}
-
-        {groups.map(group => {
-          const groupTables = tablesByGroup.get(group.id) ?? []
-          if (groupTables.length === 0 && search) return null
-          const isExpanded = expandedGroups.has(group.id)
-          const isHidden = hiddenGroups.has(group.id)
-          const displayTables = search ? groupTables : group.tables.map(name => tableByName.get(name)).filter((table): table is SchemaTable => table != null)
-          const totalCount = group.tables.length
-          const selectedCount = displayTables.filter(table => selectedTables.has(tableIdFromTable(table))).length
-          const allGroupSelected = selectedCount === totalCount && totalCount > 0
-          const isGroupDropTarget = dragTarget?.type === 'group' && dragTarget.groupId === group.id
-
-          return (
-            <div key={group.id} className={styles.groupRowWrap}>
-              <div
-                className={[styles.groupRow, isHidden ? styles.groupRowHidden : '', isGroupDropTarget && dragTarget?.position === 'before' ? styles.dropTargetBefore : '', isGroupDropTarget && dragTarget?.position === 'after' ? styles.dropTargetAfter : ''].filter(Boolean).join(' ')}
-                style={{ opacity: isHidden ? 0.5 : 1 }}
-                onContextMenu={event => { event.preventDefault(); event.stopPropagation(); setGroupCtxMenu({ x: event.clientX, y: event.clientY, groupId: group.id }) }}
-                onDragOver={event => {
-                  if (dragItem?.type !== 'group') return
-                  const rect = event.currentTarget.getBoundingClientRect()
-                  const position: DropPosition = event.clientY < rect.top + rect.height / 2 ? 'before' : 'after'
-                  updateDropPosition(event, { type: 'group', groupId: group.id, position })
-                }}
-                onDrop={event => { event.preventDefault(); event.stopPropagation(); handleGroupDrop(group.id) }}
-              >
-                {renderDragHandle('Reorder group', !canDragReorder, () => beginDrag({ type: 'group', groupId: group.id }))}
-                <button className={styles.groupToggle} onClick={() => toggleGroupExpand(group.id)}>
-                  {isExpanded ? <ChevronDown size={12} strokeWidth={2.4} /> : <ChevronRight size={12} strokeWidth={2.4} />}
-                </button>
-                <button className={styles.groupBody} onClick={() => onSelectGroup(group.id)}>
-                  <div className={styles.groupIdentity}>
-                    <div className={styles.groupSwatch} style={{ background: group.color }} />
-                    <span className={styles.groupName}>{group.name}</span>
-                    {isHidden && <span className={styles.groupStateBadge}>Hidden</span>}
-                  </div>
-                  <div className={styles.groupMetaRow}>
-                    <span className={styles.groupCount} style={{ color: allGroupSelected ? 'var(--accent)' : selectedCount > 0 ? 'var(--text-2)' : 'var(--text-3)' }}>{selectedCount > 0 ? `${selectedCount}/` : ''}{totalCount} table{totalCount !== 1 ? 's' : ''}</span>
-                    {displayTables.length !== totalCount && <span className={styles.groupFilteredMeta}>{displayTables.length} shown</span>}
-                  </div>
-                </button>
-                <button className={styles.groupActionButton} onClick={() => {
-                  const ids = group.tables.map(name => tableByName.get(name)).filter((table): table is SchemaTable => table != null).map(tableIdFromTable)
-                  if (ids.length > 0) setFitToNodes(ids)
-                }} title="Zoom to group"><Maximize2 size={12} strokeWidth={2.2} /></button>
-                <button className={styles.groupActionButton} onClick={() => onOpenGroupModal(null, group.id)} title="Edit group"><PencilLine size={12} strokeWidth={2.2} /></button>
-                <button className={styles.groupVisibilityButton} onClick={() => toggleGroupVisibility(group.id)} title={isHidden ? 'Show group' : 'Hide group'}>
-                  {isHidden ? <Eye size={12} strokeWidth={2.2} /> : <EyeOff size={12} strokeWidth={2.2} />}
-                </button>
-              </div>
-              {isExpanded && <div className={styles.groupTables} style={{ borderLeftColor: group.color }}>{displayTables.map(table => renderTableRow(table, { indent: true, dragScope: 'group', groupId: group.id }))}</div>}
-            </div>
-          )
-        })}
+        <SidebarGroupList
+          groups={groups}
+          search={search}
+          hiddenGroups={hiddenGroups}
+          selectedTables={selectedTables}
+          expandedGroups={expandedGroups}
+          tablesByGroup={tablesByGroup}
+          tableByName={tableByName}
+          dragItem={dragItem}
+          dragTarget={dragTarget}
+          canDragReorder={canDragReorder}
+          onToggleGroupExpand={toggleGroupExpand}
+          onSelectGroup={onSelectGroup}
+          onOpenGroupMenu={(groupId, x, y) => setGroupCtxMenu({ x, y, groupId })}
+          onUpdateDropPosition={updateDropPosition}
+          onHandleGroupDrop={handleGroupDrop}
+          onBeginGroupDrag={groupId => beginDrag({ type: 'group', groupId })}
+          onZoomToGroup={zoomToGroup}
+          onEditGroup={groupId => onOpenGroupModal(null, groupId)}
+          onToggleGroupVisibility={toggleGroupVisibility}
+          renderDragHandle={renderDragHandle}
+          renderTableRow={renderTableRow}
+        />
 
         {orderedUngroupedTables.length > 0 && (
           <div>

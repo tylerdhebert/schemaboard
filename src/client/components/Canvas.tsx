@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Binary, Boxes, ChevronDown, Eye, Network, RefreshCw, Rows3 } from 'lucide-react'
 import {
   MiniMap,
   ReactFlow,
@@ -15,6 +14,8 @@ import '@xyflow/react/dist/style.css'
 import { SelfLoopEdge } from './SelfLoopEdge'
 import { TablePicker } from './TablePicker'
 import { TableNode } from './TableNode'
+import { CanvasToolbar } from './canvas/CanvasToolbar'
+import { useMarqueeSelection } from './canvas/useMarqueeSelection'
 import { computeLayout } from '../lib/layout'
 import { useStore } from '../store'
 import type { Group, LayoutType, SchemaData, SchemaTable } from '../../types'
@@ -25,11 +26,6 @@ const EDGE_DIM_STROKE = 'rgba(255,255,255,0.06)'
 
 const nodeTypes = { tableNode: TableNode }
 const edgeTypes = { selfloop: SelfLoopEdge }
-const LAYOUTS: { type: LayoutType; icon: React.ReactNode; label: string }[] = [
-  { type: 'dagre', icon: <Binary size={14} strokeWidth={2} />, label: 'Dagre' },
-  { type: 'force', icon: <Network size={14} strokeWidth={2} />, label: 'Force' },
-  { type: 'elk', icon: <Boxes size={14} strokeWidth={2} />, label: 'ELK' },
-]
 
 function matchesSearch(table: SchemaTable, query: string): boolean {
   const q = query.toLowerCase()
@@ -157,102 +153,6 @@ type BaseLayout = {
   fresh: boolean
 }
 
-type MarqueeSelection = {
-  startX: number
-  startY: number
-  currentX: number
-  currentY: number
-}
-
-function CanvasControlButton({
-  icon,
-  label,
-  onClick,
-  active = false,
-}: {
-  icon: React.ReactNode
-  label: string
-  onClick: () => void
-  active?: boolean
-}) {
-  return (
-    <button
-      type="button"
-      title={label}
-      onClick={onClick}
-      className={`${styles.controlButton} ${active ? styles.controlButtonActive : ''}`}
-    >
-      <span className={styles.controlButtonIcon}>{icon}</span>
-      <span>{label}</span>
-    </button>
-  )
-}
-
-function LayoutDropdown() {
-  const { layoutType, resetLayout, setLayoutType } = useStore()
-  const [open, setOpen] = useState(false)
-  const [dropRect, setDropRect] = useState<DOMRect | null>(null)
-  const current = LAYOUTS.find(layout => layout.type === layoutType)!
-
-  useEffect(() => {
-    if (!open) return
-    const close = () => setOpen(false)
-    window.addEventListener('click', close)
-    return () => window.removeEventListener('click', close)
-  }, [open])
-
-  return (
-    <div className={styles.controlWrap}>
-      <button
-        type="button"
-        title="Switch layout algorithm"
-        onClick={event => {
-          event.stopPropagation()
-          if (open) {
-            setOpen(false)
-            return
-          }
-          setDropRect(event.currentTarget.getBoundingClientRect())
-          setOpen(true)
-        }}
-        className={`${styles.controlButton} ${open ? styles.controlButtonActive : ''}`}
-      >
-        <span className={styles.controlButtonIcon}>{current.icon}</span>
-        <span>{current.label}</span>
-        <span className={styles.controlButtonIcon}>
-          <ChevronDown size={12} strokeWidth={2.2} />
-        </span>
-      </button>
-
-      {open && dropRect && (
-        <div
-          className={styles.controlMenu}
-          style={{ left: dropRect.left, top: dropRect.bottom + 6 }}
-          onClick={event => event.stopPropagation()}
-        >
-          {LAYOUTS.map(layout => (
-            <button
-              key={layout.type}
-              type="button"
-              className={`${styles.controlMenuItem} ${layout.type === layoutType ? styles.controlMenuItemActive : ''}`}
-              onClick={() => {
-                if (layout.type !== layoutType) {
-                  setLayoutType(layout.type)
-                  resetLayout()
-                }
-                setOpen(false)
-              }}
-            >
-              <span className={styles.controlButtonIcon}>{layout.icon}</span>
-              <span>{layout.label}</span>
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
 export function Canvas({ schemaData, groups }: CanvasProps) {
   const {
     clearSelection,
@@ -273,11 +173,7 @@ export function Canvas({ schemaData, groups }: CanvasProps) {
     triggerFitView,
   } = useStore()
   const [showTablePicker, setShowTablePicker] = useState(false)
-  const [marqueeSelection, setMarqueeSelection] = useState<MarqueeSelection | null>(null)
   const canvasRef = useRef<HTMLDivElement | null>(null)
-  const viewportRef = useRef<Viewport>({ x: 0, y: 0, zoom: 1 })
-  const marqueeStateRef = useRef<{ startX: number; startY: number; moved: boolean } | null>(null)
-  const suppressContextMenuRef = useRef(false)
 
   const tableToGroups = useMemo(() => {
     const map = new Map<string, Group[]>()
@@ -324,6 +220,18 @@ export function Canvas({ schemaData, groups }: CanvasProps) {
 
   const [rfNodes, setRfNodes, onNodesChange] = useNodesState<Node>([])
   const [rfEdges, setRfEdges, onEdgesChange] = useEdgesState<Edge>([])
+  const {
+    marqueeSelection,
+    marqueeBox,
+    viewportRef,
+    beginMarqueeSelection,
+    handleContextMenuCapture,
+  } = useMarqueeSelection({
+    canvasRef,
+    rfNodes,
+    selectTables,
+    clearSelection,
+  })
   const appliedLayoutRef = useRef<BaseLayout | null>(null)
   const prevTablePositionsRef = useRef(tablePositions)
 
@@ -385,141 +293,24 @@ export function Canvas({ schemaData, groups }: CanvasProps) {
     setTablePosition(node.id, node.position)
   }, [setTablePosition])
 
-  const finishMarqueeSelection = useCallback((selection: MarqueeSelection | null) => {
-    marqueeStateRef.current = null
-    setMarqueeSelection(null)
-    if (!selection) return
-
-    const { x, y, zoom } = viewportRef.current
-    const left = Math.min(selection.startX, selection.currentX)
-    const top = Math.min(selection.startY, selection.currentY)
-    const right = Math.max(selection.startX, selection.currentX)
-    const bottom = Math.max(selection.startY, selection.currentY)
-    const width = right - left
-    const height = bottom - top
-
-    if (width < 6 || height < 6) return
-
-    const flowLeft = (left - x) / zoom
-    const flowTop = (top - y) / zoom
-    const flowRight = (right - x) / zoom
-    const flowBottom = (bottom - y) / zoom
-
-    const selectedIds = rfNodes
-      .filter(node => {
-        const box = getNodeBox(node as Node & { measured?: { width?: number; height?: number } })
-        return !(
-          box.right < flowLeft ||
-          box.left > flowRight ||
-          box.bottom < flowTop ||
-          box.top > flowBottom
-        )
-      })
-      .map(node => node.id)
-
-    clearSelection()
-    if (selectedIds.length > 0) {
-      selectTables(selectedIds)
-    }
-  }, [rfNodes, clearSelection, selectTables])
-
-  useEffect(() => {
-    function handlePointerMove(event: MouseEvent) {
-      const marqueeState = marqueeStateRef.current
-      const canvas = canvasRef.current
-      if (!marqueeState || !canvas) return
-
-      const rect = canvas.getBoundingClientRect()
-      const nextX = event.clientX - rect.left
-      const nextY = event.clientY - rect.top
-      const moved = Math.abs(nextX - marqueeState.startX) > 4 || Math.abs(nextY - marqueeState.startY) > 4
-      marqueeStateRef.current = { ...marqueeState, moved: marqueeState.moved || moved }
-      if (moved) suppressContextMenuRef.current = true
-
-      setMarqueeSelection({
-        startX: marqueeState.startX,
-        startY: marqueeState.startY,
-        currentX: nextX,
-        currentY: nextY,
-      })
-    }
-
-    function handlePointerUp() {
-      finishMarqueeSelection(marqueeSelection)
-    }
-
-    window.addEventListener('mousemove', handlePointerMove)
-    window.addEventListener('mouseup', handlePointerUp)
-    return () => {
-      window.removeEventListener('mousemove', handlePointerMove)
-      window.removeEventListener('mouseup', handlePointerUp)
-    }
-  }, [finishMarqueeSelection, marqueeSelection])
-
   const allTableIds = useMemo(
     () => schemaData.tables.map(table => `${table.schema}.${table.name}`),
     [schemaData.tables]
   )
 
-  const marqueeBox = marqueeSelection ? {
-    left: Math.min(marqueeSelection.startX, marqueeSelection.currentX),
-    top: Math.min(marqueeSelection.startY, marqueeSelection.currentY),
-    width: Math.abs(marqueeSelection.currentX - marqueeSelection.startX),
-    height: Math.abs(marqueeSelection.currentY - marqueeSelection.startY),
-  } : null
-
   return (
     <div
       ref={canvasRef}
       className={`${styles.canvas} ${marqueeSelection ? styles.canvasSelecting : ''}`}
-      onMouseDownCapture={event => {
-        if (event.button !== 2 || !canvasRef.current) return
-
-        const target = event.target as HTMLElement
-        if (target.closest('[data-table-id]') || target.closest(`.${styles.controls}`)) return
-
-        event.preventDefault()
-        event.stopPropagation()
-
-        const rect = canvasRef.current.getBoundingClientRect()
-        const startX = event.clientX - rect.left
-        const startY = event.clientY - rect.top
-        marqueeStateRef.current = { startX, startY, moved: false }
-        setMarqueeSelection({ startX, startY, currentX: startX, currentY: startY })
-      }}
-      onContextMenuCapture={event => {
-        if (suppressContextMenuRef.current) {
-          suppressContextMenuRef.current = false
-          event.preventDefault()
-          event.stopPropagation()
-          return
-        }
-
-        const target = event.target as HTMLElement
-        if (!target.closest('[data-table-id]')) {
-          event.preventDefault()
-        }
-      }}
+      onMouseDownCapture={event => beginMarqueeSelection(event, styles.controls)}
+      onContextMenuCapture={handleContextMenuCapture}
     >
-      <div className={styles.controls}>
-        <CanvasControlButton
-          icon={<RefreshCw size={14} strokeWidth={2.2} />}
-          label="Recalc"
-          onClick={resetLayout}
-        />
-        <LayoutDropdown />
-        <CanvasControlButton
-          icon={<Rows3 size={14} strokeWidth={2.2} />}
-          label={compactNodes ? 'Show columns' : 'Headers only'}
-          onClick={toggleCompactNodes}
-          active={compactNodes}
-        />
-        <CanvasControlButton
-          icon={<Eye size={14} strokeWidth={2.2} />}
-          label="Choose visible"
-          onClick={() => setShowTablePicker(true)}
-        />
-      </div>
+      <CanvasToolbar
+        compactNodes={compactNodes}
+        onResetLayout={resetLayout}
+        onToggleCompactNodes={toggleCompactNodes}
+        onChooseVisible={() => setShowTablePicker(true)}
+      />
       <ReactFlow
         nodes={rfNodes}
         edges={rfEdges}
