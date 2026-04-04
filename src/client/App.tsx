@@ -317,7 +317,6 @@ export function App() {
 
   const {
     contextText: selectionContextText,
-    selectedTableData,
     selectedTableIds,
     selectedTableNames,
     selectedTables: selectedTableSet,
@@ -326,9 +325,6 @@ export function App() {
   const ctxMenuTableName = ctxMenu ? tableNameFromId(ctxMenu.tableId) : null
   const ctxMenuGroups = ctxMenuTableName
     ? (groups as Group[]).filter(group => group.tables.includes(ctxMenuTableName))
-    : []
-  const ctxMenuSelectedTableNames = ctxMenu && selectedTables.has(ctxMenu.tableId) && selectedTableNames.length > 1
-    ? selectedTableNames
     : []
   const assignableCtxGroups = useMemo(
     () => (groups as Group[]).filter(group => !ctxMenuGroups.some(item => item.id === group.id)),

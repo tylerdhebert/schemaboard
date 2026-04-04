@@ -10,8 +10,8 @@ import {
   Trash2,
   X,
 } from 'lucide-react'
-import type { Connection, SchemaData, SchemaSnapshot, SchemaSnapshotSummary } from '../../types'
-import { CollectionCard, countTotalChanges, formatDate, MetricCard, readRouteError, schemaStats, sourceMeta, SummaryBucketCard, TonePill } from './schema-diff/helpers'
+import type { Connection, SchemaData } from '../../types'
+import { CollectionCard, countTotalChanges, formatDate, MetricCard, readRouteError, SummaryBucketCard, TonePill } from './schema-diff/helpers'
 import { useSchemaDiffData, type CompareMode, type DriftFocus } from './schema-diff/useSchemaDiffData'
 import styles from './SchemaDiffModal.module.css'
 
@@ -37,6 +37,7 @@ export function SchemaDiffModal({
   const [filterQuery, setFilterQuery] = useState('')
   const [hideEmptyBuckets, setHideEmptyBuckets] = useState(true)
   const [driftFocus, setDriftFocus] = useState<DriftFocus>('all')
+  const hasFilterQuery = filterQuery.trim().length > 0
   const {
     compareConnectionOptions,
     snapshots,
@@ -241,7 +242,7 @@ export function SchemaDiffModal({
                 <MetricCard icon={<Boxes size={16} strokeWidth={2.2} />} label="Table drift" value={activeDiff.currentOnlyTables.length + activeDiff.comparisonOnlyTables.length} accent="rgba(245,158,11,0.95)" />
                 <MetricCard icon={<Binary size={16} strokeWidth={2.2} />} label="Column drift" value={activeDiff.currentOnlyColumns.length + activeDiff.comparisonOnlyColumns.length + activeDiff.changedColumns.length} accent="rgba(74,123,245,0.95)" />
                 <MetricCard icon={<Link2 size={16} strokeWidth={2.2} />} label="Foreign key drift" value={activeDiff.currentOnlyForeignKeys.length + activeDiff.comparisonOnlyForeignKeys.length} accent="rgba(34,194,200,0.95)" />
-                <MetricCard icon={<GitCompareArrows size={16} strokeWidth={2.2} />} label={normalizedFilter ? 'Filtered deltas' : 'Total deltas'} value={countTotalChanges(activeDiff)} accent="rgba(236,72,153,0.95)" />
+                <MetricCard icon={<GitCompareArrows size={16} strokeWidth={2.2} />} label={hasFilterQuery ? 'Filtered deltas' : 'Total deltas'} value={countTotalChanges(activeDiff)} accent="rgba(236,72,153,0.95)" />
               </div>
 
               <div className={styles.toolbar}>

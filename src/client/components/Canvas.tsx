@@ -175,9 +175,17 @@ export function Canvas({ schemaData, groups }: CanvasProps) {
   const [showTablePicker, setShowTablePicker] = useState(false)
   const canvasRef = useRef<HTMLDivElement | null>(null)
 
+  const groupMembershipKey = useMemo(
+    () => groups
+      .map(group => `${group.id}:${group.color}:${[...group.tables].sort().join(',')}`)
+      .sort()
+      .join('|'),
+    [groups]
+  )
+
   const tableToGroups = useMemo(() => {
     const map = new Map<string, Group[]>()
-    for (const group of groups) {
+    for (const group of [...groups].sort((left, right) => left.id.localeCompare(right.id))) {
       for (const tableName of group.tables) {
         const existing = map.get(tableName)
         if (existing) existing.push(group)
@@ -185,7 +193,7 @@ export function Canvas({ schemaData, groups }: CanvasProps) {
       }
     }
     return map
-  }, [groups])
+  }, [groupMembershipKey])
 
   const visibleTables = useMemo(
     () => schemaData.tables.filter(table => {
