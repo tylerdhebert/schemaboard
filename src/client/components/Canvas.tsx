@@ -334,6 +334,8 @@ export function Canvas({ schemaData, groups }: CanvasProps) {
           nodeColor={node => (node.data as { selected?: boolean }).selected ? '#4a7bf5' : 'rgba(255,255,255,0.12)'}
           maskColor="rgba(0,0,0,0.45)"
           className={styles.miniMap}
+          pannable={true}
+          zoomable={true}
         />
       </ReactFlow>
 
