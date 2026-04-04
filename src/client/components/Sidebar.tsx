@@ -1,29 +1,21 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
-  Binary,
-  Boxes,
   Check,
   ChevronDown,
   ChevronRight,
   Copy,
-  Eye,
   EyeOff,
   FolderMinus,
   FolderPlus,
-  Gauge,
   Layers3,
   Maximize2,
-  Network,
   PencilLine,
   Plus,
-  RefreshCw,
-  Rows3,
   X,
 } from 'lucide-react'
 import { useStore } from '../store'
 import { generateCondensed, generateDDL } from '../lib/context-generator'
-import { TablePicker } from './TablePicker'
-import type { Group, LayoutType, SchemaData, SchemaTable } from '../../types'
+import type { Group, SchemaData, SchemaTable } from '../../types'
 import styles from './Sidebar.module.css'
 
 interface SidebarProps {
@@ -38,56 +30,6 @@ interface SidebarProps {
 
 function tableNameFromId(tableId: string): string {
   return tableId.split('.').slice(1).join('.')
-}
-
-function IconBtn({
-  icon,
-  label,
-  onClick,
-  active,
-}: {
-  icon: React.ReactNode
-  label: string
-  onClick: () => void
-  active?: boolean
-}) {
-  const [hovered, setHovered] = useState(false)
-  const leaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  function handleEnter() {
-    if (leaveTimer.current) clearTimeout(leaveTimer.current)
-    setHovered(true)
-  }
-
-  function handleLeave() {
-    leaveTimer.current = setTimeout(() => setHovered(false), 120)
-  }
-
-  return (
-    <button
-      onMouseEnter={handleEnter}
-      onMouseLeave={handleLeave}
-      onClick={onClick}
-      title={label}
-      className={styles.iconButton}
-      style={{
-        border: `1px solid ${active ? 'var(--accent)' : 'var(--border-strong)'}`,
-        background: active ? 'var(--accent-light)' : 'none',
-        color: active ? 'var(--accent)' : 'var(--text-3)',
-      }}
-    >
-      <span className={styles.iconButtonIcon}>{icon}</span>
-      <span
-        className={styles.iconButtonLabel}
-        style={{
-          maxWidth: hovered ? 120 : 0,
-          paddingLeft: hovered ? 5 : 0,
-        }}
-      >
-        {label}
-      </span>
-    </button>
-  )
 }
 
 function MenuHeader({
@@ -136,87 +78,6 @@ function MenuAction({
   )
 }
 
-const LAYOUTS: { type: LayoutType; icon: React.ReactNode; label: string }[] = [
-  { type: 'dagre', icon: <Binary size={14} strokeWidth={2} />, label: 'Dagre' },
-  { type: 'force', icon: <Network size={14} strokeWidth={2} />, label: 'Force' },
-  { type: 'elk', icon: <Boxes size={14} strokeWidth={2} />, label: 'ELK' },
-]
-
-function LayoutDropdown() {
-  const { layoutType, resetLayout, setLayoutType } = useStore()
-  const [open, setOpen] = useState(false)
-  const [dropRect, setDropRect] = useState<DOMRect | null>(null)
-  const current = LAYOUTS.find(layout => layout.type === layoutType)!
-
-  useEffect(() => {
-    if (!open) return
-    const close = () => setOpen(false)
-    window.addEventListener('click', close)
-    return () => window.removeEventListener('click', close)
-  }, [open])
-
-  return (
-    <div className={styles.layoutWrap}>
-      <button
-        onClick={event => {
-          event.stopPropagation()
-          if (open) {
-            setOpen(false)
-            return
-          }
-          setDropRect(event.currentTarget.getBoundingClientRect())
-          setOpen(true)
-        }}
-        title="Switch layout algorithm"
-        className={styles.layoutButton}
-        style={{
-          border: `1px solid ${open ? 'var(--accent)' : 'var(--border-strong)'}`,
-          background: open ? 'var(--accent-light)' : 'none',
-          color: open ? 'var(--accent)' : 'var(--text-3)',
-        }}
-      >
-        <span className={styles.layoutIcon}>{current.icon}</span>
-        <span className={styles.layoutIcon} style={{ color: open ? 'var(--accent)' : 'var(--text-3)' }}>
-          <ChevronDown size={12} strokeWidth={2.2} />
-        </span>
-      </button>
-
-      {open && dropRect && (
-        <div
-          className={styles.layoutMenu}
-          style={{
-            left: dropRect.left,
-            top: dropRect.bottom + 4,
-          }}
-          onClick={event => event.stopPropagation()}
-        >
-          {LAYOUTS.map(layout => (
-            <div
-              key={layout.type}
-              onClick={() => {
-                if (layout.type !== layoutType) {
-                  setLayoutType(layout.type)
-                  resetLayout()
-                }
-                setOpen(false)
-              }}
-              className={styles.layoutMenuItem}
-              style={{
-                fontWeight: layout.type === layoutType ? 700 : 500,
-                color: layout.type === layoutType ? 'var(--accent)' : 'var(--text-1)',
-                background: layout.type === layoutType ? 'var(--accent-light)' : 'transparent',
-              }}
-            >
-              <span className={styles.layoutMenuItemIcon}>{layout.icon}</span>
-              {layout.label}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
 export function Sidebar({
   schemaData,
   groups,
@@ -229,7 +90,6 @@ export function Sidebar({
   const [search, setSearch] = useState('')
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; nodeId: string } | null>(null)
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
-  const [showTablePicker, setShowTablePicker] = useState(false)
   const [groupCtxMenu, setGroupCtxMenu] = useState<{ x: number; y: number; groupId: string } | null>(null)
   const [selectionMenu, setSelectionMenu] = useState<{ x: number; y: number } | null>(null)
   const [copiedSelectionContext, setCopiedSelectionContext] = useState(false)
@@ -237,20 +97,16 @@ export function Sidebar({
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const {
-    compactNodes,
     clearSelection,
     format,
     deselectTables,
     hiddenGroups,
     hiddenTables,
-    resetLayout,
     selectedTables,
     selectTables,
     setFitToNodes,
-    setHiddenTables,
     setSearchQuery,
     setZoomToTable,
-    toggleCompactNodes,
     toggleGroupVisibility,
     toggleTable,
     toggleTableVisibility,
@@ -293,11 +149,6 @@ export function Sidebar({
 
   const tableByName = useMemo(
     () => new Map(schemaData.tables.map(table => [table.name, table])),
-    [schemaData.tables]
-  )
-
-  const allTableIds = useMemo(
-    () => schemaData.tables.map(table => `${table.schema}.${table.name}`),
     [schemaData.tables]
   )
 
@@ -402,11 +253,12 @@ export function Sidebar({
     setSelectionAnchorId(nodeId)
   }
 
-  function renderTableRow(table: SchemaTable, indent = false) {
+  function renderTableRow(table: SchemaTable, options?: { indent?: boolean }) {
     const nodeId = `${table.schema}.${table.name}`
     const isSelected = selectedTables.has(nodeId)
     const isHidden = hiddenTables.has(nodeId)
     const matchedCols = columnMatches.get(table.name)
+    const indent = options?.indent ?? false
 
     return (
       <div
@@ -417,9 +269,8 @@ export function Sidebar({
           setCtxMenu({ x: event.clientX, y: event.clientY, nodeId })
         }}
         onClick={event => handleTableClick(event, nodeId)}
-        className={styles.tableRow}
+        className={`${styles.tableRow} ${indent ? styles.tableRowNested : ''}`}
         style={{
-          paddingLeft: indent ? 22 : 9,
           background: isSelected ? 'var(--sel-light)' : 'transparent',
           opacity: isHidden ? 0.35 : 1,
         }}
@@ -483,49 +334,24 @@ export function Sidebar({
         />
       </div>
 
-      <div className={styles.toolbar}>
-        <IconBtn icon={<RefreshCw size={14} strokeWidth={2.2} />} label="Recalc layout" onClick={resetLayout} />
-        <IconBtn icon={<Eye size={14} strokeWidth={2.2} />} label="Choose visible" onClick={() => setShowTablePicker(true)} />
-        <IconBtn
-          icon={allExpanded ? <Maximize2 size={14} strokeWidth={2.2} /> : <Gauge size={14} strokeWidth={2.2} />}
-          label={allExpanded ? 'Collapse all' : 'Expand all'}
-          onClick={toggleExpandAll}
-          active={allExpanded}
-        />
-        <IconBtn
-          icon={<Rows3 size={14} strokeWidth={2.2} />}
-          label={compactNodes ? 'Show columns' : 'Headers only'}
-          onClick={toggleCompactNodes}
-          active={compactNodes}
-        />
-        <LayoutDropdown />
-        <div className={styles.spacer} />
-        <IconBtn icon={<FolderPlus size={14} strokeWidth={2.2} />} label="New group" onClick={() => onOpenGroupModal()} />
-      </div>
-
-      {hiddenTables.size > 0 && (
-        <div className={styles.showHiddenWrap}>
-          <button className={styles.showHiddenButton} onClick={() => setHiddenTables([])}>
-            Show hidden tables ({hiddenTables.size})
-          </button>
-        </div>
-      )}
-
-      {selectedTables.size > 0 && (
-        <div className={styles.selectionToolbar}>
+      <div className={styles.selectionSlot}>
+        <div className={`${styles.selectionToolbar} ${selectedTables.size === 0 ? styles.selectionToolbarIdle : ''}`}>
           <div className={styles.selectionToolbarHeader}>
             <div className={styles.selectionToolbarSummary}>
               <span className={styles.selectionToolbarCount}>{selectedTables.size}</span>
               <div className={styles.selectionToolbarCopy}>
                 <span className={styles.selectionToolbarEyebrow}>Selection</span>
                 <span className={styles.selectionToolbarLabel}>
-                  {selectedTables.size} table{selectedTables.size === 1 ? '' : 's'} selected
+                  {selectedTables.size > 0
+                    ? `${selectedTables.size} table${selectedTables.size === 1 ? '' : 's'} selected`
+                    : 'No tables selected'}
                 </span>
               </div>
             </div>
             <button
               type="button"
-              className={`${styles.selectionToolbarButton} ${styles.selectionToolbarButtonMuted}`}
+              disabled={selectedTables.size === 0}
+              className={`${styles.selectionToolbarButton} ${styles.selectionToolbarButtonMuted} ${selectedTables.size === 0 ? styles.selectionToolbarButtonDisabled : ''}`}
               onClick={event => {
                 event.stopPropagation()
                 clearSelection()
@@ -538,7 +364,8 @@ export function Sidebar({
           <div className={styles.selectionToolbarActions}>
             <button
               type="button"
-              className={styles.selectionToolbarButton}
+              disabled={selectedTables.size === 0}
+              className={`${styles.selectionToolbarButton} ${selectedTables.size === 0 ? styles.selectionToolbarButtonDisabled : ''}`}
               onClick={event => {
                 event.stopPropagation()
                 setFitToNodes(selectedTableIds)
@@ -549,7 +376,8 @@ export function Sidebar({
             </button>
             <button
               type="button"
-              className={`${styles.selectionToolbarButton} ${styles.selectionToolbarButtonPrimary}`}
+              disabled={selectedTables.size === 0}
+              className={`${styles.selectionToolbarButton} ${styles.selectionToolbarButtonPrimary} ${selectedTables.size === 0 ? styles.selectionToolbarButtonDisabled : ''}`}
               onClick={event => {
                 event.stopPropagation()
                 const rect = event.currentTarget.getBoundingClientRect()
@@ -562,7 +390,8 @@ export function Sidebar({
             </button>
             <button
               type="button"
-              className={styles.selectionToolbarButton}
+              disabled={selectedTables.size === 0}
+              className={`${styles.selectionToolbarButton} ${selectedTables.size === 0 ? styles.selectionToolbarButtonDisabled : ''}`}
               onClick={handleCopySelectionContext}
             >
               {copiedSelectionContext ? <Check size={12} strokeWidth={2.4} /> : <Copy size={12} strokeWidth={2.2} />}
@@ -570,7 +399,8 @@ export function Sidebar({
             </button>
             <button
               type="button"
-              className={styles.selectionToolbarButton}
+              disabled={selectedTables.size === 0}
+              className={`${styles.selectionToolbarButton} ${selectedTables.size === 0 ? styles.selectionToolbarButtonDisabled : ''}`}
               onClick={event => {
                 event.stopPropagation()
                 selectedTableIds.forEach(id => toggleTableVisibility(id))
@@ -581,6 +411,33 @@ export function Sidebar({
               Hide
             </button>
           </div>
+        </div>
+      </div>
+
+      <div className={styles.sectionLabel}>Groups</div>
+      <div className={styles.toolbar}>
+        <button
+          type="button"
+          className={`${styles.toolbarButton} ${allExpanded ? styles.toolbarButtonActive : ''}`}
+          onClick={toggleExpandAll}
+        >
+          {allExpanded ? 'Collapse groups' : 'Expand groups'}
+        </button>
+        <button
+          type="button"
+          className={`${styles.toolbarButton} ${styles.toolbarButtonPrimary}`}
+          onClick={() => onOpenGroupModal()}
+        >
+          <FolderPlus size={13} strokeWidth={2.2} />
+          New group
+        </button>
+      </div>
+
+      {hiddenTables.size > 0 && (
+        <div className={styles.showHiddenWrap}>
+          <button className={styles.showHiddenButton} onClick={() => setHiddenTables([])}>
+            Show hidden tables ({hiddenTables.size})
+          </button>
         </div>
       )}
 
@@ -830,7 +687,11 @@ export function Sidebar({
                   {isHidden ? <Eye size={12} strokeWidth={2.2} /> : <EyeOff size={12} strokeWidth={2.2} />}
                 </button>
               </div>
-              {isExpanded && displayTables.map(table => renderTableRow(table, true))}
+              {isExpanded && (
+                <div className={styles.groupTables} style={{ borderLeftColor: group.color }}>
+                  {displayTables.map(table => renderTableRow(table, { indent: true }))}
+                </div>
+              )}
             </div>
           )
         })}
@@ -844,19 +705,6 @@ export function Sidebar({
           </div>
         )}
       </div>
-
-      {showTablePicker && (
-        <TablePicker
-          tables={allTableIds}
-          selected={allTableIds.filter(id => !hiddenTables.has(id))}
-          onChange={selected => {
-            const newHidden = allTableIds.filter(id => !selected.includes(id))
-            setHiddenTables(newHidden)
-          }}
-          onClose={() => setShowTablePicker(false)}
-          title="Choose visible tables"
-        />
-      )}
     </aside>
   )
 }
