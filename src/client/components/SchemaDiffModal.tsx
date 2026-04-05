@@ -55,6 +55,7 @@ export function SchemaDiffModal({
     foreignKeyDrift,
     visibleSummaryBuckets,
     detailSections,
+    showChangedColumns,
     visibleChangedColumns,
   } = useSchemaDiffData({
     activeConnection,

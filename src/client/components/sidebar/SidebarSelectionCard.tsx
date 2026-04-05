@@ -47,7 +47,7 @@ export function SidebarSelectionCard({
             }}
             title="Clear selection"
           >
-            <X size={12} strokeWidth={2.2} />
+            <X size={12} strokeWidth={2.2} /> Clear
           </button>
         </div>
         <div className={styles.selectionToolbarActions}>

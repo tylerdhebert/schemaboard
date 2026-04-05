@@ -313,6 +313,7 @@ export function useSchemaDiffData({
     foreignKeyDrift,
     visibleSummaryBuckets,
     detailSections,
+    showChangedColumns,
     visibleChangedColumns,
   }
 }
