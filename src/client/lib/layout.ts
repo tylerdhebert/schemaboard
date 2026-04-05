@@ -13,6 +13,11 @@ function nodeHeight(table: SchemaTable) {
   return NODE_HEIGHT_BASE + table.columns.length * ROW_HEIGHT + 16
 }
 
+function inferParentCardinality(table: SchemaTable, foreignKey: ForeignKey): '1' | 'many' {
+  const column = table.columns.find(candidate => candidate.name === foreignKey.parentColumn)
+  return column?.isPK ? '1' : 'many'
+}
+
 function buildEdges(tables: SchemaTable[], foreignKeys: ForeignKey[]): Edge[] {
   const nodeIds = new Set(tables.map(t => `${t.schema}.${t.name}`))
   const tableByName = new Map(tables.map(t => [t.name, t]))
@@ -33,9 +38,13 @@ function buildEdges(tables: SchemaTable[], foreignKeys: ForeignKey[]): Edge[] {
       id: edgeId,
       source: src,
       target: tgt,
-      label: fk.parentColumn,
-      type: src === tgt ? 'selfloop' : 'smoothstep',
+      type: src === tgt ? 'selfloop' : 'relationship',
       style: { strokeDasharray: '5 3' },
+      data: {
+        parentColumn: fk.parentColumn,
+        sourceCardinality: inferParentCardinality(p, fk),
+        targetCardinality: '1',
+      },
     })
   }
 

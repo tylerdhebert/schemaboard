@@ -11,6 +11,7 @@ import {
   type Viewport,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
+import { RelationshipEdge } from './RelationshipEdge'
 import { SelfLoopEdge } from './SelfLoopEdge'
 import { TablePicker } from './TablePicker'
 import { TableNode } from './TableNode'
@@ -23,9 +24,10 @@ import styles from './Canvas.module.css'
 
 const EDGE_ACTIVE_STROKE = 'rgba(74,123,245,0.5)'
 const EDGE_DIM_STROKE = 'rgba(255,255,255,0.06)'
+const EDGE_ENERGIZED_STROKE = 'rgba(126,169,255,0.92)'
 
 const nodeTypes = { tableNode: TableNode }
-const edgeTypes = { selfloop: SelfLoopEdge }
+const edgeTypes = { relationship: RelationshipEdge, selfloop: SelfLoopEdge }
 
 function matchesSearch(table: SchemaTable, query: string): boolean {
   const q = query.toLowerCase()
@@ -173,6 +175,7 @@ export function Canvas({ schemaData, groups }: CanvasProps) {
     triggerFitView,
   } = useStore()
   const [showTablePicker, setShowTablePicker] = useState(false)
+  const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null)
   const canvasRef = useRef<HTMLDivElement | null>(null)
 
   const groupMembershipKey = useMemo(
@@ -277,6 +280,7 @@ export function Canvas({ schemaData, groups }: CanvasProps) {
     }
 
     setRfEdges(baseLayout.edges.map(edge => {
+      const energized = draggingNodeId != null && (edge.source === draggingNodeId || edge.target === draggingNodeId)
       const sourceSelected = selectedTables.has(edge.source as string)
       const targetSelected = selectedTables.has(edge.target as string)
       const active = selectedTables.size === 0 || (sourceSelected && targetSelected)
@@ -285,19 +289,28 @@ export function Canvas({ schemaData, groups }: CanvasProps) {
         ...edge,
         style: {
           ...edge.style,
-          stroke: active ? EDGE_ACTIVE_STROKE : EDGE_DIM_STROKE,
-          strokeWidth: active ? 1.5 : 1,
+          stroke: energized ? EDGE_ENERGIZED_STROKE : active ? EDGE_ACTIVE_STROKE : EDGE_DIM_STROKE,
+          strokeWidth: energized ? 1.9 : active ? 1.5 : 1,
         },
-        animated: false,
+        data: {
+          ...(edge.data as Record<string, unknown> | undefined),
+          energized,
+        },
+        animated: energized,
       }
     }))
-  }, [baseLayout, selectedTables, tableToGroups, searchQuery, compactNodes, tablePositions, setRfNodes, setRfEdges, triggerFitView])
+  }, [baseLayout, selectedTables, tableToGroups, searchQuery, compactNodes, tablePositions, draggingNodeId, setRfNodes, setRfEdges, triggerFitView])
 
   const onNodeClick: NodeMouseHandler = useCallback((_event, node) => {
     toggleTable(node.id)
   }, [toggleTable])
 
+  const onNodeDragStart: NodeMouseHandler = useCallback((_event, node) => {
+    setDraggingNodeId(node.id)
+  }, [])
+
   const onNodeDragStop: NodeMouseHandler = useCallback((_event, node) => {
+    setDraggingNodeId(null)
     setTablePosition(node.id, node.position)
   }, [setTablePosition])
 
@@ -325,6 +338,7 @@ export function Canvas({ schemaData, groups }: CanvasProps) {
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onNodeClick={onNodeClick}
+        onNodeDragStart={onNodeDragStart}
         onNodeDragStop={onNodeDragStop}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}

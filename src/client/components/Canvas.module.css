@@ -30,15 +30,23 @@
   top: 14px;
   left: 14px;
   z-index: 20;
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  max-width: min(100% - 28px, 640px);
+  isolation: isolate;
+  min-height: 38px;
 }
 
 .controlWrap {
   position: relative;
+}
+
+.controlWrapMenuOpen::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  height: 12px;
 }
 
 .controlButton {
@@ -58,7 +66,7 @@
   font-weight: 700;
   box-shadow: 0 12px 28px rgba(5, 10, 18, 0.2);
   backdrop-filter: blur(18px);
-  transition: background 140ms ease, border-color 140ms ease, color 140ms ease;
+  transition: background 140ms ease, border-color 140ms ease, color 140ms ease, transform 180ms ease, opacity 180ms ease;
 }
 
 .controlButton:hover {
@@ -81,8 +89,53 @@
   flex-shrink: 0;
 }
 
+.controlsExpanded {
+  z-index: 30;
+}
+
+.controlGearButton {
+  position: relative;
+  z-index: 2;
+  width: 38px;
+  min-width: 38px;
+  padding: 0;
+  border-radius: 999px;
+}
+
+.controlFlyout {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding-left: 48px;
+  min-height: 38px;
+  padding-right: 8px;
+  pointer-events: auto;
+  border-radius: 999px;
+}
+
+.controlFlyoutButton {
+  transform: translateX(-18px) scale(0.92);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.controlFlyoutButtonVisible {
+  transform: translateX(0) scale(1);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.controlChevronOpen {
+  transform: rotate(180deg);
+}
+
 .controlMenu {
-  position: fixed;
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
   z-index: 40;
   min-width: 160px;
   padding: 6px;
@@ -119,8 +172,187 @@
   color: var(--accent);
 }
 
+.controlFlyout .controlFlyoutButton:nth-child(1) {
+  transition-delay: 0ms;
+}
+
+.controlFlyout .controlFlyoutButton:nth-child(2) {
+  transition-delay: 28ms;
+}
+
+.controlFlyout .controlFlyoutButton:nth-child(3) {
+  transition-delay: 56ms;
+}
+
+.controlFlyout .controlFlyoutButton:nth-child(4) {
+  transition-delay: 84ms;
+}
+
+.controlFlyout .controlFlyoutButton:nth-child(5) {
+  transition-delay: 112ms;
+}
+
+.controlFlyout .controlFlyoutButton:nth-child(6) {
+  transition-delay: 140ms;
+}
+
 .miniMap {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--r-sm);
+}
+
+.edgeEnergyGlow,
+.edgeEnergyPulse {
+  fill: none;
+  pointer-events: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.edgeEnergyGlow {
+  stroke: rgba(88, 138, 255, 0.28);
+  stroke-width: 7;
+  opacity: 0.9;
+  filter: drop-shadow(0 0 8px rgba(74, 123, 245, 0.28));
+  animation: edgeEnergyGlow 920ms ease-in-out infinite alternate;
+}
+
+.edgeEnergyPulse {
+  stroke: rgba(186, 223, 255, 0.96);
+  stroke-width: 2.3;
+  stroke-dasharray: 2 14;
+  animation: edgeEnergyFlow 760ms linear infinite, edgeEnergyFlicker 1200ms ease-in-out infinite;
+}
+
+.edgeBadge {
+  position: absolute;
+  pointer-events: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: var(--text-1);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 10px 24px rgba(5, 10, 18, 0.18);
+}
+
+.edgeCardinalityBadge {
+  min-width: 22px;
+  height: 22px;
+  padding: 0 7px;
+  border-radius: 999px;
+  border: 1px solid rgba(126, 169, 255, 0.24);
+  background: color-mix(in srgb, var(--surface) 88%, #0b1018 12%);
+}
+
+.edgeColumnBadge {
+  min-height: 22px;
+  padding: 0 9px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--border) 78%, rgba(255, 255, 255, 0.08) 22%);
+  background: color-mix(in srgb, var(--surface) 90%, #0b1018 10%);
+  color: var(--text-2);
+  text-transform: none;
+  letter-spacing: 0.01em;
+  transition: border-color 180ms ease, color 180ms ease, box-shadow 220ms ease, background 220ms ease;
+}
+
+.edgeColumnBadgeEnergized {
+  color: rgba(235, 244, 255, 0.98);
+  border-color: rgba(126, 169, 255, 0.34);
+  background: color-mix(in srgb, var(--surface) 82%, rgba(76, 126, 245, 0.18) 18%);
+  box-shadow:
+    0 10px 24px rgba(5, 10, 18, 0.18),
+    0 0 0 1px rgba(126, 169, 255, 0.08),
+    0 0 18px rgba(74, 123, 245, 0.24),
+    0 0 32px rgba(126, 169, 255, 0.12);
+}
+
+@keyframes edgeEnergyFlow {
+  to {
+    stroke-dashoffset: -32;
+  }
+}
+
+@keyframes edgeEnergyGlow {
+  from {
+    opacity: 0.45;
+    stroke-width: 5.5;
+  }
+
+  to {
+    opacity: 0.95;
+    stroke-width: 8;
+  }
+}
+
+@keyframes edgeEnergyFlicker {
+  0%, 100% {
+    opacity: 0.42;
+  }
+
+  20% {
+    opacity: 0.96;
+  }
+
+  55% {
+    opacity: 0.7;
+  }
+
+  78% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .edgeEnergyGlow,
+  .edgeEnergyPulse {
+    animation: none;
+  }
+
+  .edgeEnergyGlow {
+    opacity: 0.5;
+    stroke-width: 6;
+  }
+
+  .edgeEnergyPulse {
+    opacity: 0.9;
+  }
+}
+
+@media (max-width: 880px) {
+  .controlFlyout {
+    top: 46px;
+    left: 0;
+    flex-direction: column;
+    align-items: flex-start;
+    padding-left: 0;
+    padding-right: 0;
+    min-width: 160px;
+  }
+
+  .controlFlyoutButton {
+    transform: translateY(-12px) scale(0.92);
+  }
+
+  .controlFlyoutButtonVisible {
+    transform: translateY(0) scale(1);
+  }
+
+  .controlMenu {
+    top: 0;
+    left: calc(100% + 8px);
+  }
+
+  .controlWrapMenuOpen::after {
+    top: 0;
+    left: 100%;
+    right: auto;
+    width: 12px;
+    height: 100%;
+  }
 }
