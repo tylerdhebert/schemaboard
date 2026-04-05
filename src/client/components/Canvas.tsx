@@ -4,6 +4,7 @@ import {
   ReactFlow,
   useEdgesState,
   useNodesState,
+  useNodesInitialized,
   useReactFlow,
   type Edge,
   type Node,
@@ -52,7 +53,9 @@ function getNodeBox(node: Node & { measured?: { width?: number; height?: number 
 function ZoomController() {
   const { fitToNodes, fitViewKey, setFitToNodes, setZoomToTable, zoomToTable } = useStore()
   const { fitView, getNode, setCenter, setViewport } = useReactFlow()
+  const nodesInitialized = useNodesInitialized()
   const prevFitViewKey = useRef(fitViewKey)
+  const pendingFitViewKeyRef = useRef<number | null>(null)
   const frameRef = useRef<number | null>(null)
 
   useEffect(() => {
@@ -135,12 +138,20 @@ function ZoomController() {
     if (prevFitViewKey.current === fitViewKey) return
 
     prevFitViewKey.current = fitViewKey
+    pendingFitViewKeyRef.current = fitViewKey
+  }, [fitViewKey])
+
+  useEffect(() => {
+    if (!nodesInitialized) return
+    if (pendingFitViewKeyRef.current == null) return
+
+    pendingFitViewKeyRef.current = null
     const frame = requestAnimationFrame(() => {
       fitView({ duration: 400, padding: 0.15 })
     })
 
     return () => cancelAnimationFrame(frame)
-  }, [fitViewKey, fitView])
+  }, [fitViewKey, nodesInitialized, fitView])
 
   return null
 }
@@ -148,15 +159,17 @@ function ZoomController() {
 interface CanvasProps {
   schemaData: SchemaData
   groups: Group[]
+  viewportResetKey: string
 }
 
 type BaseLayout = {
   nodes: Node[]
   edges: Edge[]
   fresh: boolean
+  viewportResetKey: string
 }
 
-export function Canvas({ schemaData, groups }: CanvasProps) {
+export function Canvas({ schemaData, groups, viewportResetKey }: CanvasProps) {
   const {
     clearSelection,
     compactNodes,
@@ -210,9 +223,17 @@ export function Canvas({ schemaData, groups }: CanvasProps) {
     [schemaData.tables, tableToGroups, hiddenGroups, hiddenTables]
   )
 
-  const [baseLayout, setBaseLayout] = useState<BaseLayout>({ nodes: [], edges: [], fresh: true })
+  const [baseLayout, setBaseLayout] = useState<BaseLayout>({ nodes: [], edges: [], fresh: true, viewportResetKey })
   const prevLayoutKeyRef = useRef(layoutKey)
   const prevLayoutTypeRef = useRef(layoutType)
+  const pendingViewportResetKeyRef = useRef<string | null>(viewportResetKey)
+  const prevViewportResetKeyRef = useRef(viewportResetKey)
+
+  useEffect(() => {
+    if (prevViewportResetKeyRef.current === viewportResetKey) return
+    prevViewportResetKeyRef.current = viewportResetKey
+    pendingViewportResetKeyRef.current = viewportResetKey
+  }, [viewportResetKey])
 
   useEffect(() => {
     let cancelled = false
@@ -222,13 +243,13 @@ export function Canvas({ schemaData, groups }: CanvasProps) {
 
     computeLayout(layoutType, visibleTables, schemaData.foreignKeys).then(({ nodes, edges }) => {
       if (cancelled) return
-      setBaseLayout({ nodes, edges, fresh })
+      setBaseLayout({ nodes, edges, fresh, viewportResetKey })
     })
 
     return () => {
       cancelled = true
     }
-  }, [visibleTables, schemaData.foreignKeys, layoutKey, layoutType])
+  }, [visibleTables, schemaData.foreignKeys, layoutKey, layoutType, viewportResetKey])
 
   const [rfNodes, setRfNodes, onNodesChange] = useNodesState<Node>([])
   const [rfEdges, setRfEdges, onEdgesChange] = useEdgesState<Edge>([])
@@ -277,6 +298,14 @@ export function Canvas({ schemaData, groups }: CanvasProps) {
     })
 
     if (isNewLayout && baseLayout.fresh) {
+      triggerFitView()
+    }
+
+    if (
+      pendingViewportResetKeyRef.current === baseLayout.viewportResetKey &&
+      baseLayout.nodes.length > 0
+    ) {
+      pendingViewportResetKeyRef.current = null
       triggerFitView()
     }
 
@@ -345,8 +374,6 @@ export function Canvas({ schemaData, groups }: CanvasProps) {
         onNodeDragStop={onNodeDragStop}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
-        fitView
-        fitViewOptions={{ padding: 0.15 }}
         minZoom={0.01}
         maxZoom={2}
         onMove={(_, viewport) => {

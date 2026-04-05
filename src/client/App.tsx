@@ -443,7 +443,11 @@ export function App() {
 
         <div className={styles.canvasArea}>
           {effectiveConnection ? (
-            <Canvas schemaData={schemaData} groups={groups as Group[]} />
+            <Canvas
+              schemaData={schemaData}
+              groups={groups as Group[]}
+              viewportResetKey={effectiveConnection}
+            />
           ) : (
             <div className={styles.emptyState}>
               Select a source to load a schema
