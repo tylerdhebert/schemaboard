@@ -1,6 +1,7 @@
-import { memo } from 'react'
-import { Handle, Position } from '@xyflow/react'
+import { memo, useEffect, useMemo } from 'react'
+import { Handle, Position, useUpdateNodeInternals } from '@xyflow/react'
 import type { Group, SchemaTable } from '../../types'
+import { DEFAULT_SOURCE_HANDLE_ID, DEFAULT_TARGET_HANDLE_ID, sourceHandleId, targetHandleId } from '../lib/table-handles'
 import styles from './TableNode.module.css'
 
 interface TableNodeData {
@@ -20,6 +21,15 @@ interface TableNodeProps {
 export const TableNode = memo(function TableNode({ id, data }: TableNodeProps) {
   const { table, groups, selected, dim, matched, compact } = data
   const groupColors = groups.length > 0 ? groups.map(group => group.color) : ['var(--text-3)']
+  const updateNodeInternals = useUpdateNodeInternals()
+  const handlesKey = useMemo(
+    () => `${compact ? 'compact' : 'full'}:${table.columns.map(column => column.name).join('|')}`,
+    [compact, table.columns]
+  )
+
+  useEffect(() => {
+    updateNodeInternals(id)
+  }, [id, handlesKey, updateNodeInternals])
 
   return (
     <div
@@ -39,8 +49,8 @@ export const TableNode = memo(function TableNode({ id, data }: TableNodeProps) {
         opacity: dim ? 0.35 : 1,
       }}
     >
-      <Handle type="target" position={Position.Left} className={styles.hiddenHandle} />
-      <Handle type="source" position={Position.Right} className={styles.hiddenHandle} />
+      <Handle id={DEFAULT_TARGET_HANDLE_ID} type="target" position={Position.Left} className={styles.hiddenHandle} />
+      <Handle id={DEFAULT_SOURCE_HANDLE_ID} type="source" position={Position.Right} className={styles.hiddenHandle} />
 
       <div className={styles.header}>
         <div className={styles.groupBars}>
@@ -56,6 +66,18 @@ export const TableNode = memo(function TableNode({ id, data }: TableNodeProps) {
         <div className={styles.columns}>
           {table.columns.map(column => (
             <div key={column.name} className={styles.columnRow}>
+              <Handle
+                id={targetHandleId(column.name)}
+                type="target"
+                position={Position.Left}
+                className={`${styles.hiddenHandle} ${compact ? styles.hiddenHandleDisabled : ''}`}
+              />
+              <Handle
+                id={sourceHandleId(column.name)}
+                type="source"
+                position={Position.Right}
+                className={`${styles.hiddenHandle} ${compact ? styles.hiddenHandleDisabled : ''}`}
+              />
               {column.isPK ? (
                 <span className={`${styles.badge} ${styles.pkBadge}`}>PK</span>
               ) : column.isFK ? (

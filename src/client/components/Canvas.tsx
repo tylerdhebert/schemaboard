@@ -18,6 +18,7 @@ import { TableNode } from './TableNode'
 import { CanvasToolbar } from './canvas/CanvasToolbar'
 import { useMarqueeSelection } from './canvas/useMarqueeSelection'
 import { computeLayout } from '../lib/layout'
+import { DEFAULT_SOURCE_HANDLE_ID, DEFAULT_TARGET_HANDLE_ID } from '../lib/table-handles'
 import { useStore } from '../store'
 import type { Group, LayoutType, SchemaData, SchemaTable } from '../../types'
 import styles from './Canvas.module.css'
@@ -292,6 +293,8 @@ export function Canvas({ schemaData, groups }: CanvasProps) {
           stroke: energized ? EDGE_ENERGIZED_STROKE : active ? EDGE_ACTIVE_STROKE : EDGE_DIM_STROKE,
           strokeWidth: energized ? 1.9 : active ? 1.5 : 1,
         },
+        sourceHandle: compactNodes ? DEFAULT_SOURCE_HANDLE_ID : edge.sourceHandle,
+        targetHandle: compactNodes ? DEFAULT_TARGET_HANDLE_ID : edge.targetHandle,
         data: {
           ...(edge.data as Record<string, unknown> | undefined),
           energized,

@@ -58,9 +58,12 @@ describe('computeLayout', () => {
     const { edges } = await computeLayout('dagre', tables, fks)
     expect(edges[0].data).toEqual(expect.objectContaining({
       parentColumn: 'CustomerId',
+      referencedColumn: 'Id',
       sourceCardinality: 'many',
       targetCardinality: '1',
     }))
+    expect(edges[0].sourceHandle).toBe('source:CustomerId')
+    expect(edges[0].targetHandle).toBe('target:Id')
   })
 
   test('dagre: nodes have position set', async () => {

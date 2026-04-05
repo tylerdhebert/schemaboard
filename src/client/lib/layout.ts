@@ -4,6 +4,7 @@ import type {
   SimulationNodeDatum, SimulationLinkDatum,
 } from 'd3-force'
 import type { SchemaTable, ForeignKey, LayoutType } from '../../types'
+import { sourceHandleId, targetHandleId } from './table-handles'
 
 const NODE_WIDTH = 220
 const NODE_HEIGHT_BASE = 44
@@ -38,10 +39,13 @@ function buildEdges(tables: SchemaTable[], foreignKeys: ForeignKey[]): Edge[] {
       id: edgeId,
       source: src,
       target: tgt,
+      sourceHandle: sourceHandleId(fk.parentColumn),
+      targetHandle: targetHandleId(fk.referencedColumn),
       type: src === tgt ? 'selfloop' : 'relationship',
       style: { strokeDasharray: '5 3' },
       data: {
         parentColumn: fk.parentColumn,
+        referencedColumn: fk.referencedColumn,
         sourceCardinality: inferParentCardinality(p, fk),
         targetCardinality: '1',
       },
